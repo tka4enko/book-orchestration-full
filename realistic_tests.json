@@ -1,0 +1,410 @@
+{
+  "meta": {
+    "created": "2025-08-20",
+    "total_tests": 40,
+    "collection_analyzed": "books",
+    "books_count": 8
+  },
+  "realistic_tests": [
+    {
+      "id": "R001",
+      "query": "1984 George Orwell",
+      "category": "exact",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "af5da7ce-51fb-45c1-bd38-806a9153ee1d",
+      "content_preview": "1984 by George Orwell - dystopian novel about totalitarian society",
+      "notes": "Точный запрос - должна найти правильную книгу"
+    },
+    {
+      "id": "R002", 
+      "query": "Radikální otevřenost Kim Scott",
+      "category": "exact",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "b3fbff9c-3d55-46e2-a5b6-3b628b6f9fc1",
+      "content_preview": "Radikální otevřenost by Kim Scottová - business leadership book",
+      "notes": "Точное название и автор"
+    },
+    {
+      "id": "R003",
+      "query": "Proč spíme Matthew Walker",
+      "category": "exact",
+      "expected_intent": "author_title",
+      "expected_outcome": "success", 
+      "expected_doc_id": "bc7fa267-f60f-4f11-a73e-2b66adb52f56",
+      "content_preview": "Proč spíme by Matthew Walker - book about sleep importance",
+      "notes": "Точное название и автор"
+    },
+    {
+      "id": "R004",
+      "query": "KBT kniha pro děti",
+      "category": "exact",
+      "expected_intent": "title",
+      "expected_outcome": "success",
+      "expected_doc_id": "e078f8f1-81f4-47b6-8256-04e4d230d040", 
+      "content_preview": "KBT pracovní kniha pro děti - CBT workbook for children",
+      "notes": "Частичное название но должно найти"
+    },
+    {
+      "id": "R005",
+      "query": "Čtyři dohody don Miguel Ruiz",
+      "category": "exact",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "087761e8-de97-41d8-bd98-8a4a14537b48",
+      "content_preview": "Čtyři dohody by don Miguel Ruiz - spiritual teachings",
+      "notes": "Точное название и автор"
+    },
+    {
+      "id": "R006",
+      "query": "101 esejů Brianna Wiest",
+      "category": "exact",
+      "expected_intent": "author_title", 
+      "expected_outcome": "success",
+      "expected_doc_id": "5bc3bdc3-f458-43ea-8255-b5a56cd2c84c",
+      "content_preview": "101 esejů, které změní vaše myšlení by Brianna Wiest",
+      "notes": "Частичное название но точный автор"
+    },
+    {
+      "id": "R007",
+      "query": "Napoleon Hill Jak přelstít ďábla",
+      "category": "exact",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "6dcbf01e-4f4e-41ce-8e65-284ae6c78525",
+      "content_preview": "Jak přelstít ďábla by Napoleon Hill - motivational book",
+      "notes": "Перестановка автор-название"
+    },
+    {
+      "id": "R008",
+      "query": "Radical Candor",
+      "category": "exact",
+      "expected_intent": "title",
+      "expected_outcome": "success",
+      "expected_doc_id": "b3fbff9c-3d55-46e2-a5b6-3b628b6f9fc1",
+      "content_preview": "Radikální otevřenost by Kim Scottová - business leadership book",
+      "notes": "Английский алиас чешского названия"
+    },
+    {
+      "id": "R009",
+      "query": "Georg Orwel 1984",
+      "category": "typo",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "af5da7ce-51fb-45c1-bd38-806a9153ee1d",
+      "content_preview": "1984 by George Orwell - dystopian novel",
+      "notes": "Опечатка в имени автора"
+    },
+    {
+      "id": "R010",
+      "query": "Kim Scot Radikální otevřenost",
+      "category": "typo",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "b3fbff9c-3d55-46e2-a5b6-3b628b6f9fc1",
+      "content_preview": "Radikální otevřenost by Kim Scottová",
+      "notes": "Опечатка в фамилии автора"
+    },
+    {
+      "id": "R011",
+      "query": "Matew Walker Proc spime",
+      "category": "typo",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "bc7fa267-f60f-4f11-a73e-2b66adb52f56",
+      "content_preview": "Proč spíme by Matthew Walker",
+      "notes": "Опечатки в имени автора и названии без диакритики"
+    },
+    {
+      "id": "R012",
+      "query": "Napolen Hill prelstit dabla",
+      "category": "typo",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "6dcbf01e-4f4e-41ce-8e65-284ae6c78525",
+      "content_preview": "Jak přelstít ďábla by Napoleon Hill",
+      "notes": "Опечатка в имени, частичное название без диакритики"
+    },
+    {
+      "id": "R013",
+      "query": "Brianna Wist 101 eseji",
+      "category": "typo",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "5bc3bdc3-f458-43ea-8255-b5a56cd2c84c",
+      "content_preview": "101 esejů, které změní vaše myšlení by Brianna Wiest",
+      "notes": "Опечатка в фамилии, частичное название"
+    },
+    {
+      "id": "R014",
+      "query": "don Miguel Ruiz Ctyri dohody",
+      "category": "typo",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "087761e8-de97-41d8-bd98-8a4a14537b48",
+      "content_preview": "Čtyři dohody by don Miguel Ruiz",
+      "notes": "Название без диакритики"
+    },
+    {
+      "id": "R015",
+      "query": "Heather Davidson KBT deti",
+      "category": "typo",
+      "expected_intent": "author_title",
+      "expected_outcome": "success",
+      "expected_doc_id": "e078f8f1-81f4-47b6-8256-04e4d230d040",
+      "content_preview": "KBT pracovní kniha pro děti by Heather Davidsonová",
+      "notes": "Сокращенная фамилия автора, частичное название"
+    },
+    {
+      "id": "R016",
+      "query": "1984 book",
+      "category": "partial",
+      "expected_intent": "title", 
+      "expected_outcome": "success",
+      "expected_doc_id": "af5da7ce-51fb-45c1-bd38-806a9153ee1d",
+      "content_preview": "1984 by George Orwell",
+      "notes": "Только название с общим словом"
+    },
+    {
+      "id": "R017",
+      "query": "spánek kniha",
+      "category": "topic",
+      "expected_intent": "topic",
+      "expected_outcome": "success",
+      "expected_doc_id": "bc7fa267-f60f-4f11-a73e-2b66adb52f56",
+      "content_preview": "Proč spíme by Matthew Walker - about sleep",
+      "notes": "Поиск по теме на чешском"
+    },
+    {
+      "id": "R018",
+      "query": "leadership management",
+      "category": "topic",
+      "expected_intent": "topic",
+      "expected_outcome": "success",
+      "expected_doc_id": "b3fbff9c-3d55-46e2-a5b6-3b628b6f9fc1",
+      "content_preview": "Radikální otevřenost - leadership and management book",
+      "notes": "Поиск по бизнес-тематике"
+    },
+    {
+      "id": "R019", 
+      "query": "книги про духовность",
+      "category": "topic",
+      "expected_intent": "topic",
+      "expected_outcome": "success",
+      "expected_doc_id": "087761e8-de97-41d8-bd98-8a4a14537b48",
+      "content_preview": "Čtyři dohody - spiritual book",
+      "notes": "Русский запрос о духовности"
+    },
+    {
+      "id": "R020",
+      "query": "anxiety children therapy",
+      "category": "topic",
+      "expected_intent": "topic",
+      "expected_outcome": "success",
+      "expected_doc_id": "e078f8f1-81f4-47b6-8256-04e4d230d040",
+      "content_preview": "KBT pracovní kniha pro děti - CBT for children anxiety",
+      "notes": "Английский поиск по детской терапии"
+    },
+    {
+      "id": "R021",
+      "query": "self-help personal development",
+      "category": "topic",
+      "expected_intent": "topic",
+      "expected_outcome": "success", 
+      "expected_doc_id": "5bc3bdc3-f458-43ea-8255-b5a56cd2c84c",
+      "content_preview": "101 esejů - self-help and personal development",
+      "notes": "Поиск по жанру саморазвития"
+    },
+    {
+      "id": "R022",
+      "query": "dystopian future society",
+      "category": "topic",
+      "expected_intent": "topic",
+      "expected_outcome": "success",
+      "expected_doc_id": "af5da7ce-51fb-45c1-bd38-806a9153ee1d",
+      "content_preview": "1984 - dystopian novel about society",
+      "notes": "Поиск по жанру антиутопии"
+    },
+    {
+      "id": "R023",
+      "query": "1984 by Stephen King",
+      "category": "confusing",
+      "expected_intent": "author_title",
+      "expected_outcome": "clarify",
+      "expected_doc_id": "af5da7ce-51fb-45c1-bd38-806a9153ee1d",
+      "content_preview": "1984 by George Orwell (not Stephen King)",
+      "notes": "Неправильный автор к существующей книге"
+    },
+    {
+      "id": "R024",
+      "query": "Radikální otevřenost Napoleon Hill",
+      "category": "confusing",
+      "expected_intent": "author_title",
+      "expected_outcome": "clarify",
+      "expected_doc_id": "b3fbff9c-3d55-46e2-a5b6-3b628b6f9fc1",
+      "content_preview": "Radikální otevřenost by Kim Scottová (not Napoleon Hill)",
+      "notes": "Неправильный автор к книге"
+    },
+    {
+      "id": "R025",
+      "query": "Proč spíme Brianna Wiest",
+      "category": "confusing", 
+      "expected_intent": "author_title",
+      "expected_outcome": "clarify",
+      "expected_doc_id": "bc7fa267-f60f-4f11-a73e-2b66adb52f56",
+      "content_preview": "Proč spíme by Matthew Walker (not Brianna Wiest)",
+      "notes": "Смешивание авторов"
+    },
+    {
+      "id": "R026",
+      "query": "Čtyři dohody George Orwell",
+      "category": "confusing",
+      "expected_intent": "author_title", 
+      "expected_outcome": "clarify",
+      "expected_doc_id": "087761e8-de97-41d8-bd98-8a4a14537b48",
+      "content_preview": "Čtyři dohody by don Miguel Ruiz (not George Orwell)",
+      "notes": "Совершенно неподходящий автор"
+    },
+    {
+      "id": "R027",
+      "query": "KBT kniha Matthew Walker",
+      "category": "confusing",
+      "expected_intent": "author_title",
+      "expected_outcome": "clarify", 
+      "expected_doc_id": "e078f8f1-81f4-47b6-8256-04e4d230d040",
+      "content_preview": "KBT pracovní kniha by Heather Davidsonová (not Matthew Walker)",
+      "notes": "Неправильный автор к специализированной книге"
+    },
+    {
+      "id": "R028",
+      "query": "101 esejů don Miguel Ruiz",
+      "category": "confusing",
+      "expected_intent": "author_title",
+      "expected_outcome": "clarify",
+      "expected_doc_id": "5bc3bdc3-f458-43ea-8255-b5a56cd2c84c", 
+      "content_preview": "101 esejů by Brianna Wiest (not don Miguel Ruiz)",
+      "notes": "Смешивание авторов self-help книг"
+    },
+    {
+      "id": "R029",
+      "query": "Harry Potter",
+      "category": "confusing",
+      "expected_intent": "title",
+      "expected_outcome": "failure",
+      "expected_doc_id": null,
+      "content_preview": "Book not found in collection",
+      "notes": "Несуществующая в коллекции книга"
+    },
+    {
+      "id": "R030",
+      "query": "War and Peace Tolstoy",
+      "category": "confusing", 
+      "expected_intent": "author_title",
+      "expected_outcome": "failure",
+      "expected_doc_id": null,
+      "content_preview": "Book not found in collection",
+      "notes": "Известная книга но отсутствующая в коллекции"
+    },
+    {
+      "id": "R031",
+      "query": "Why We Sleep",
+      "category": "cross_lang",
+      "expected_intent": "title",
+      "expected_outcome": "success",
+      "expected_doc_id": "bc7fa267-f60f-4f11-a73e-2b66adb52f56",
+      "content_preview": "Proč spíme (Why We Sleep) by Matthew Walker",
+      "notes": "Английское название чешской книги"
+    },
+    {
+      "id": "R032",
+      "query": "The Four Agreements",
+      "category": "cross_lang",
+      "expected_intent": "title",
+      "expected_outcome": "success", 
+      "expected_doc_id": "087761e8-de97-41d8-bd98-8a4a14537b48",
+      "content_preview": "Čtyři dohody (The Four Agreements) by don Miguel Ruiz",
+      "notes": "Английское название чешской книги"
+    },
+    {
+      "id": "R033",
+      "query": "101 Essays That Will Change How You Think",
+      "category": "cross_lang",
+      "expected_intent": "title",
+      "expected_outcome": "success",
+      "expected_doc_id": "5bc3bdc3-f458-43ea-8255-b5a56cd2c84c",
+      "content_preview": "101 esejů, které změní vaše myšlení by Brianna Wiest",
+      "notes": "Английское название чешского перевода"
+    },
+    {
+      "id": "R034",
+      "query": "Outwitting the Devil",
+      "category": "cross_lang",
+      "expected_intent": "title",
+      "expected_outcome": "success",
+      "expected_doc_id": "6dcbf01e-4f4e-41ce-8e65-284ae6c78525",
+      "content_preview": "Jak přelstít ďábla (Outwitting the Devil) by Napoleon Hill",
+      "notes": "Английский оригинал чешского перевода"
+    },
+    {
+      "id": "R035",
+      "query": "CBT Workbook for Kids",
+      "category": "cross_lang",
+      "expected_intent": "title",
+      "expected_outcome": "success",
+      "expected_doc_id": "e078f8f1-81f4-47b6-8256-04e4d230d040",
+      "content_preview": "KBT pracovní kniha pro děti - CBT workbook",
+      "notes": "Английский эквивалент чешского названия"
+    },
+    {
+      "id": "R036", 
+      "query": "книга про сон и здоровье",
+      "category": "cross_lang",
+      "expected_intent": "topic",
+      "expected_outcome": "success",
+      "expected_doc_id": "bc7fa267-f60f-4f11-a73e-2b66adb52f56",
+      "content_preview": "Proč spíme - book about sleep and health",
+      "notes": "Русский запрос по теме"
+    },
+    {
+      "id": "R037",
+      "query": "ISBN 9788075550491",
+      "category": "exact",
+      "expected_intent": "isbn",
+      "expected_outcome": "success",
+      "expected_doc_id": "b3fbff9c-3d55-46e2-a5b6-3b628b6f9fc1",
+      "content_preview": "Radikální otevřenost by Kim Scottová",
+      "notes": "Точный поиск по ISBN"
+    },
+    {
+      "id": "R038",
+      "query": "ISBN 9788024297774 by George Orwell",
+      "category": "confusing",
+      "expected_intent": "mixed_filters",
+      "expected_outcome": "clarify",
+      "expected_doc_id": "6dcbf01e-4f4e-41ce-8e65-284ae6c78525",
+      "content_preview": "ISBN belongs to 'Jak přelstít ďábla' by Napoleon Hill, not George Orwell",
+      "notes": "ISBN конфликт - правильный ISBN но неправильный автор"
+    },
+    {
+      "id": "R039",
+      "query": "business leadership NOT spirituality",
+      "category": "topic",
+      "expected_intent": "negative_filter",
+      "expected_outcome": "success",
+      "expected_doc_id": "b3fbff9c-3d55-46e2-a5b6-3b628b6f9fc1",
+      "content_preview": "Radikální otevřenost - business book (excluding spiritual books)",
+      "notes": "Негативный фильтр - бизнес книги исключая духовные"
+    },
+    {
+      "id": "R040",
+      "query": "самопомощь но не духовность",
+      "category": "topic",
+      "expected_intent": "negative_filter",
+      "expected_outcome": "success", 
+      "expected_doc_id": "5bc3bdc3-f458-43ea-8255-b5a56cd2c84c",
+      "content_preview": "101 esejů - self-help book (excluding spiritual books)",
+      "notes": "Русский негативный фильтр - саморазвитие исключая духовность"
+    }
+  ]
+}

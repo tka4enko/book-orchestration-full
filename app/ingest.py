@@ -165,13 +165,164 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
 
     logger.info("📊 Building master metadata...")
     master_meta = build_master_meta(base)
-    master_text = master_meta["title"] if not master_meta.get("summary") else f"{master_meta['title']} — {master_meta['summary'][:400]}"
+    
+    # Build enriched master_text for better semantic search - AFTER all metadata is complete
+    logger.info("🔍 Creating enriched master_text for semantic search...")
+    logger.info(f"📋 Available metadata: title='{master_meta.get('title')}', author='{master_meta.get('author')}', year={master_meta.get('year')}, genre='{master_meta.get('primary_genre')}'")
+    
+    # Start with title and full summary (no truncation)
+    parts = [master_meta["title"]]
+    logger.info(f"📝 Step 1 - Title: Added '{master_meta['title']}'")
+    
+    if master_meta.get("summary"):
+        parts.append(master_meta["summary"])  # Full summary, no [:400] truncation
+        logger.info(f"📝 Step 2 - Summary: Added summary ({len(master_meta['summary'])} chars)")
+    else:
+        logger.warning("⚠️ Step 2 - Summary: NO SUMMARY FOUND!")
+    
+    # Add author for author-based searches
+    if master_meta.get("author"):
+        author_part = f"Автор: {master_meta['author']}"
+        parts.append(author_part)
+        logger.info(f"📝 Step 3 - Author: Added '{author_part}'")
+    else:
+        logger.warning("⚠️ Step 3 - Author: NO AUTHOR FOUND!")
+    
+    # Add year for year-based searches  
+    if master_meta.get("year"):
+        year_part = f"Год: {master_meta['year']}"
+        parts.append(year_part)
+        logger.info(f"📝 Step 4 - Year: Added '{year_part}'")
+    else:
+        logger.warning("⚠️ Step 4 - Year: NO YEAR FOUND!")
+    
+    # Add genres for genre-based searches
+    genres = []
+    if master_meta.get("primary_genre"):
+        genres.append(master_meta["primary_genre"])
+        logger.info(f"📝 Step 5a - Primary genre: '{master_meta['primary_genre']}'")
+    
+    if master_meta.get("secondary_genres"):
+        secondary = master_meta["secondary_genres"]
+        logger.info(f"📝 Step 5b - Secondary genres raw: {secondary} (type: {type(secondary)})")
+        if isinstance(secondary, list):
+            genres.extend(secondary)
+            logger.info(f"📝 Step 5b - Added list: {secondary}")
+        elif isinstance(secondary, str):
+            try:
+                import json
+                parsed = json.loads(secondary)
+                if isinstance(parsed, list):
+                    genres.extend(parsed)
+                    logger.info(f"📝 Step 5b - Parsed JSON list: {parsed}")
+                else:
+                    genres.append(str(secondary))
+                    logger.info(f"📝 Step 5b - Added string as-is: {secondary}")
+            except:
+                genres.append(str(secondary))
+                logger.info(f"📝 Step 5b - JSON parse failed, added as string: {secondary}")
+        else:
+            genres.append(str(secondary))
+            logger.info(f"📝 Step 5b - Added other type as string: {secondary}")
+    
+    if genres:
+        genre_part = f"Жанр: {', '.join(genres)}"
+        parts.append(genre_part)
+        logger.info(f"📝 Step 5 - Genres: Added '{genre_part}'")
+    else:
+        logger.warning("⚠️ Step 5 - Genres: NO GENRES FOUND!")
+    
+    # Add topics for topic-based searches
+    topics = []
+    if master_meta.get("main_topics"):
+        main_topics = master_meta["main_topics"]
+        logger.info(f"📝 Step 6a - Main topics raw: {main_topics} (type: {type(main_topics)})")
+        if isinstance(main_topics, list):
+            topics.extend(main_topics)
+        elif isinstance(main_topics, str):
+            try:
+                import json
+                parsed = json.loads(main_topics)
+                if isinstance(parsed, list):
+                    topics.extend(parsed)
+                else:
+                    topics.append(str(main_topics))
+            except:
+                topics.append(str(main_topics))
+        else:
+            topics.append(str(main_topics))
+    
+    if master_meta.get("mentioned_topics"):
+        mentioned = master_meta["mentioned_topics"]
+        logger.info(f"📝 Step 6b - Mentioned topics raw: {mentioned} (type: {type(mentioned)})")
+        if isinstance(mentioned, list):
+            topics.extend(mentioned)
+        elif isinstance(mentioned, str):
+            try:
+                import json
+                parsed = json.loads(mentioned)
+                if isinstance(parsed, list):
+                    topics.extend(parsed)
+                else:
+                    topics.append(str(mentioned))
+            except:
+                topics.append(str(mentioned))
+        else:
+            topics.append(str(mentioned))
+    
+    if topics:
+        topics_part = f"Темы: {', '.join(topics[:10])}"  # Limit to first 10 topics to avoid too long text
+        parts.append(topics_part)
+        logger.info(f"📝 Step 6 - Topics: Added '{topics_part}' (from {len(topics)} total topics)")
+    else:
+        logger.warning("⚠️ Step 6 - Topics: NO TOPICS FOUND!")
+    
+    master_text = " — ".join(parts)
+    logger.info(f"🔧 All parts before joining: {parts}")
+    logger.info(f"✅ Enriched master_text created ({len(master_text)} chars):")
+    logger.info(f"📄 FULL MASTER TEXT: {master_text}")
+    
+    # Log what will be sent to Chroma
+    logger.info(f"📤 About to send to Chroma books store:")
+    logger.info(f"    - Text length: {len(master_text)} chars")
+    logger.info(f"    - Text preview: {master_text[:100]}...")
+    logger.info(f"    - Book ID: {_stable_id('book', master_meta['document_id'])}")
 
     logger.info("📚 Adding book to books vector store...")
     bstore = books_store()
     book_id = _stable_id("book", master_meta["document_id"])
-    bstore.add_texts(texts=[master_text], metadatas=[_scalarize_meta(master_meta)], ids=[book_id])
+    
+    # Final validation before sending to Chroma
+    scalarized_meta = _scalarize_meta(master_meta)
+    logger.info(f"🔍 FINAL VALIDATION before Chroma:")
+    logger.info(f"    📋 Book ID: {book_id}")
+    logger.info(f"    📄 Master text length: {len(master_text)} chars")
+    logger.info(f"    🏷️ is_master_chunk: {scalarized_meta.get('is_master_chunk')}")
+    logger.info(f"    📖 Title: {scalarized_meta.get('title')}")
+    logger.info(f"    👤 Author: {scalarized_meta.get('author')}")
+    logger.info(f"    🎭 Genre: {scalarized_meta.get('primary_genre')}")
+    logger.info(f"    📅 Year: {scalarized_meta.get('year')}")
+    logger.info(f"    📄 Master text preview: {master_text[:150]}...")
+    
+    bstore.add_texts(texts=[master_text], metadatas=[scalarized_meta], ids=[book_id])
     logger.info(f"✅ Book added to store with ID: {book_id}")
+    
+    # Verify what was actually stored
+    logger.info(f"🔍 VERIFICATION: Reading back from Chroma...")
+    try:
+        coll = bstore._collection
+        stored_data = coll.get(ids=[book_id], include=["documents", "metadatas"])
+        if stored_data["documents"]:
+            stored_text = stored_data["documents"][0]
+            stored_meta = stored_data["metadatas"][0] if stored_data["metadatas"] else {}
+            logger.info(f"    ✅ Successfully stored and retrieved")
+            logger.info(f"    📄 Stored text length: {len(stored_text)} chars")
+            logger.info(f"    📄 Stored text preview: {stored_text[:150]}...")
+            logger.info(f"    🏷️ Stored is_master_chunk: {stored_meta.get('is_master_chunk')}")
+        else:
+            logger.error(f"    ❌ Failed to retrieve stored document!")
+    except Exception as e:
+        logger.error(f"    ❌ Verification failed: {e}")
 
     logger.info("✂️ Splitting text into chunks...")
     cstore = content_store()
@@ -197,6 +348,10 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
             hash_store = get_file_hash_store()
             hash_store.add_hash(master_meta["document_id"], file_hash, file_path)
 
+    # Clear BM25 cache since we added new documents
+    from .retrievers import clear_bm25_cache
+    clear_bm25_cache()
+    
     logger.info("✨ Ingest process completed successfully!")
     
     # Return success result

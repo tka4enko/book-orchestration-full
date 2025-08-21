@@ -1,14 +1,25 @@
 import os, json, logging
 from typing import Optional
-from fastapi import FastAPI, UploadFile, File, Form, Query
+from fastapi import FastAPI, UploadFile, File, Form, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from .ingest import ingest_one, books_store, content_store
 from .orchestrator import graph, ChatState
+from .orchestrator_with_chat import graph_with_chat, ChatStateWithChat
+from .simple_orchestrator import process_simple_search
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Pre-load NLTK data at startup for better performance
+logger.info("🔧 Pre-loading NLTK data...")
+try:
+    from .retrievers import _ensure_nltk
+    _ensure_nltk()
+    logger.info("✅ NLTK data loaded successfully")
+except Exception as e:
+    logger.warning(f"⚠️ NLTK pre-loading failed: {e}")
 
 # Debug LangSmith configuration
 import os
@@ -34,8 +45,22 @@ def index():
 def health():
     return {"ok": True}
 
+@app.get("/chat_test", response_class=HTMLResponse)
+def chat_test():
+    with open(os.path.join(os.path.dirname(__file__), "static", "chat_test.html"), "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
+@app.get("/simple-chat", response_class=HTMLResponse)
+def simple_chat_page():
+    """Веб-интерфейс для тестирования простого поиска"""
+    with open(os.path.join(os.path.dirname(__file__), "static", "simple_chat.html"), "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
 @app.post("/chat")
 def chat(body: ChatIn):
+    import time
+    start_time = time.time()
+    
     logger.info("=" * 80)
     logger.info(f"🔥 CHAT REQUEST STARTED")
     logger.info(f"   Session: {body.session_id}")
@@ -50,6 +75,25 @@ def chat(body: ChatIn):
         
         logger.info("✅ [main.py] LangGraph execution completed")
         
+        # Finalize debug session here - at the very end of request
+        from .debug_reporter import finalize_debug
+        try:
+            # Handle both dict and object types
+            if isinstance(out, dict) and 'results' in out:
+                results = out['results']
+            elif hasattr(out, 'results'):
+                results = out.results
+            else:
+                results = []
+            
+            final_count = len([r for r in results if isinstance(r, dict) and r.get('title')])
+            execution_time_ms = (time.time() - start_time) * 1000  # Convert to milliseconds
+            finalize_debug(final_count, execution_time_ms)
+        except Exception as debug_error:
+            logger.warning(f"Debug finalization failed: {debug_error}")
+            import traceback
+            traceback.print_exc()
+        
         try:
             if hasattr(out, "model_dump"):
                 payload = out.model_dump()
@@ -60,6 +104,19 @@ def chat(body: ChatIn):
                     payload = dict(out)  # type: ignore[arg-type]
                 except Exception:
                     payload = {"result": str(out)}
+            
+            # Add performance metrics to response
+            if hasattr(out, 'performance_metrics') and out.performance_metrics:
+                payload["performance_metrics"] = out.performance_metrics
+                total_time = sum(out.performance_metrics.values())
+                payload["total_execution_time_ms"] = total_time
+                logger.info(f"📊 [main.py] Performance metrics: {out.performance_metrics}")
+                logger.info(f"⏱️ [main.py] Total execution time: {total_time:.1f}ms")
+            
+            # Add detailed search metrics to response
+            if hasattr(out, 'search_metrics') and out.search_metrics:
+                payload["search_metrics"] = out.search_metrics
+                logger.info(f"📊 [main.py] Search metrics: {out.search_metrics}")
                     
             logger.info(f"📤 [main.py] Response prepared with {len(payload.get('results', []))} results")
             logger.info("=" * 80)
@@ -75,6 +132,45 @@ def chat(body: ChatIn):
         logger.error(f"💥 [main.py] Chat request failed: {e}")
         logger.error("=" * 80)
         return JSONResponse({"error": f"Chat failed: {e}"}, status_code=500)
+
+@app.post("/simple_chat")
+async def simple_chat(body: ChatIn):
+    """Простой поиск с LLM фильтром - альтернативная реализация без BM25"""
+    import time
+    start_time = time.time()
+    
+    logger.info("=" * 80)
+    logger.info(f"🔍 SIMPLE CHAT REQUEST STARTED")
+    logger.info(f"   Session: {body.session_id}")
+    logger.info(f"   Query: '{body.message}'")
+    logger.info("=" * 80)
+    
+    try:
+        # Используем новый простой orchestrator
+        result = await process_simple_search(body.session_id, body.message)
+        
+        # Добавляем общее время выполнения
+        total_time = time.time() - start_time
+        result["total_execution_time_seconds"] = total_time
+        
+        logger.info(f"📤 [simple_chat] Response prepared with {len(result.get('results', []))} results")
+        logger.info(f"⏱️ [simple_chat] Total execution time: {total_time:.2f}s")
+        logger.info("=" * 80)
+        logger.info("🎉 SIMPLE CHAT REQUEST COMPLETED SUCCESSFULLY")
+        logger.info("=" * 80)
+        
+        return JSONResponse(result)
+        
+    except Exception as e:
+        logger.error(f"💥 [simple_chat] Simple chat request failed: {e}")
+        logger.error("=" * 80)
+        return JSONResponse({
+            "error": f"Simple chat failed: {e}",
+            "response": "Извините, произошла ошибка при обработке запроса.",
+            "results": [],
+            "intent": "error",
+            "total_execution_time_seconds": time.time() - start_time
+        }, status_code=500)
 
 @app.post("/ingest")
 async def ingest_endpoint(file: UploadFile = File(...), meta: str = Form(None), prefer_llm: str = Form(None), max_chunks: str = Form(None), force_ingest: str = Form(None)):
@@ -140,20 +236,47 @@ def collection_meta(name: str, limit: int = Query(3, ge=1, le=200)):
         return JSONResponse({"error":"unknown collection"}, status_code=404)
     coll = store._collection
     total = coll.count()
-    sample = coll.get(limit=limit, include=["documents","metadatas"])
+    
+    # For books collection, only show master chunks
+    if name == "books":
+        sample = coll.get(
+            where={"is_master_chunk": True}, 
+            limit=limit, 
+            include=["documents","metadatas"]
+        )
+        # Get count of only master chunks for books
+        try:
+            master_count = coll.count(where={"is_master_chunk": True})
+        except:
+            master_count = total  # Fallback to total count if filtering fails
+    else:
+        sample = coll.get(limit=limit, include=["documents","metadatas"])
+        master_count = total
+    
     docs = sample.get("documents", []) or []
     metas = sample.get("metadatas", []) or []
     items = []
     for i, (d, m) in enumerate(zip(docs, metas)):
+        # For books collection, show full content without truncation to see all enriched metadata
+        # For other collections, keep 120 char limit
+        if name == "books":
+            content_preview = d or ""  # Full content for books
+        else:
+            content_preview = (d or "")[:120]  # Truncated for content/other collections
+            
         items.append({
             "id": m.get("document_id") if isinstance(m, dict) else None,
-            "content_preview": (d or "")[:120],
+            "content_preview": content_preview,
             "content_length": len(d or ""),
             "metadata": m,
         })
+    
+    # Use master_count for books, total for other collections
+    actual_total = master_count if name == "books" else total
+    
     return JSONResponse({
         "collection_name": name,
-        "stats": {"total_documents": total, "returned_count": len(docs), "limit": limit},
+        "stats": {"total_documents": actual_total, "returned_count": len(docs), "limit": limit},
         "documents": items,
         "available_endpoints": {
             "view_chunks": f"/vector-store/collection/{name}/chunks",
@@ -180,9 +303,16 @@ def collection_chunks(name: str, document_id: Optional[str] = Query(default=None
     metas = data.get("metadatas", []) or []
     items = []
     for _id, doc, meta in zip(ids, docs, metas):
+        # For books collection, show full content without truncation to see all enriched metadata
+        # For other collections, keep 200 char limit
+        if name == "books":
+            content_preview = doc or ""  # Full content for books
+        else:
+            content_preview = (doc or "")[:200]  # Truncated for content/other collections
+            
         items.append({
             "id": _id,
-            "content_preview": (doc or "")[:200],
+            "content_preview": content_preview,
             "content_length": len(doc or ""),
             "metadata": meta
         })
@@ -207,3 +337,55 @@ def search_collection(name: str, q: str = Query(..., min_length=1), k: int = Que
     docs = store.similarity_search(q, k=k)
     results = [{"content_preview": (d.page_content or "")[:200], "content_length": len(d.page_content or ""), "metadata": d.metadata} for d in docs]
     return JSONResponse({"collection_name": name, "k": k, "query": q, "results": results})
+
+# Хранилище истории чата для сессий
+chat_histories = {}
+
+@app.websocket("/ws/chat_test")
+async def chat_test_websocket(websocket: WebSocket):
+    await websocket.accept()
+    
+    try:
+        while True:
+            raw_message = await websocket.receive_json()
+            session_id = raw_message.get("session_id", "default")
+            user_message = raw_message.get("message", "")
+            
+            logger.info(f"🧪 [ChatTest] Message from {session_id}: '{user_message}'")
+            
+            # Получаем историю для сессии
+            chat_history = chat_histories.get(session_id, [])
+            
+            # Используем новый orchestrator с чатом
+            state = ChatStateWithChat(session_id=session_id, message=user_message, chat_history=chat_history)
+            result = graph_with_chat.invoke(state)
+            
+            # Форматируем ответ
+            if hasattr(result, "model_dump"):
+                response_data = result.model_dump()
+            else:
+                response_data = result
+            
+            # Обновляем историю чата
+            if hasattr(result, "chat_history"):
+                chat_histories[session_id] = result.chat_history
+            elif "chat_history" in response_data:
+                chat_histories[session_id] = response_data["chat_history"]
+            
+            # Создаем ответ для фронтенда
+            response = {
+                "reply": response_data.get("results", [{}])[0].get("message", ""),
+                "cards": [],  # Будем добавлять позже
+                "chips": response_data.get("results", [{}])[0].get("chips", []),
+                "intent": response_data.get("intent", "chat"),
+                "debug": {
+                    "intent": response_data.get("intent"),
+                    "mode": "chat_test",
+                    "processing_time": "N/A"
+                }
+            }
+            
+            await websocket.send_json(response)
+            
+    except WebSocketDisconnect:
+        logger.info("🧪 [ChatTest] Client disconnected")

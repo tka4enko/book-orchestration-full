@@ -1,0 +1,190 @@
+{
+  "summary": {
+    "total_tests": 10,
+    "passed": 0,
+    "failed": 10,
+    "success_rate": 0.0,
+    "category_stats": {
+      "exact": {
+        "passed": 0,
+        "failed": 8
+      },
+      "typo": {
+        "passed": 0,
+        "failed": 2
+      }
+    }
+  },
+  "detailed_results": [
+    {
+      "test_id": "R001",
+      "query": "1984 George Orwell",
+      "category": "exact",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 5.475994825363159,
+      "books": [
+        {
+          "title": "1984",
+          "author": "George Orwell",
+          "score": 0.7272514998912811,
+          "collection": "books_merged"
+        }
+      ]
+    },
+    {
+      "test_id": "R002",
+      "query": "Radikální otevřenost Kim Scott",
+      "category": "exact",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 5.696766138076782,
+      "books": [
+        {
+          "title": "Radikální otevřenost",
+          "author": "Kim Scottová",
+          "score": 0.7254723906517029,
+          "collection": "books_merged"
+        }
+      ]
+    },
+    {
+      "test_id": "R003",
+      "query": "Proč spíme Matthew Walker",
+      "category": "exact",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 5.9178502559661865,
+      "books": [
+        {
+          "title": "Proč spíme",
+          "author": "Matthew Walker",
+          "score": 0.6514208018779755,
+          "collection": "books_merged"
+        }
+      ]
+    },
+    {
+      "test_id": "R004",
+      "query": "KBT kniha pro děti",
+      "category": "exact",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 6.532282114028931,
+      "books": [
+        {
+          "title": "KBT pracovní kniha pro děti",
+          "author": "Heather Davidsonová, Psy.D, BCN",
+          "score": 0.7548611909151077,
+          "collection": "books_merged"
+        }
+      ]
+    },
+    {
+      "test_id": "R005",
+      "query": "Čtyři dohody don Miguel Ruiz",
+      "category": "exact",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 4.667251825332642,
+      "books": [
+        {
+          "title": "Čtyři dohody",
+          "author": "don Miguel Ruiz",
+          "score": 0.7516751289367676,
+          "collection": "books_merged"
+        }
+      ]
+    },
+    {
+      "test_id": "R006",
+      "query": "101 esejů Brianna Wiest",
+      "category": "exact",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 4.833854913711548,
+      "books": [
+        {
+          "title": "101 esejů, které změní vaše myšlení",
+          "author": "Brianna Wiest",
+          "score": 0.6030194759368896,
+          "collection": "books_merged"
+        }
+      ]
+    },
+    {
+      "test_id": "R007",
+      "query": "Napoleon Hill Jak přelstít ďábla",
+      "category": "exact",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 5.685369968414307,
+      "books": [
+        {
+          "title": "Jak přelstít ďábla",
+          "author": "Napoleon Hill",
+          "score": 0.7025855481624603,
+          "collection": "books_merged"
+        }
+      ]
+    },
+    {
+      "test_id": "R008",
+      "query": "Radical Candor",
+      "category": "exact",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 5.843363046646118,
+      "books": [
+        {
+          "title": "Radikální otevřenost",
+          "author": "Kim Scottová",
+          "score": 0.5634654760360718,
+          "collection": "books_merged"
+        }
+      ]
+    },
+    {
+      "test_id": "R009",
+      "query": "Georg Orwel 1984",
+      "category": "typo",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 4.6723878383636475,
+      "books": [
+        {
+          "title": "1984",
+          "author": "George Orwell",
+          "score": 0.6310347318649292,
+          "collection": "books_merged"
+        }
+      ]
+    },
+    {
+      "test_id": "R010",
+      "query": "Kim Scot Radikální otevřenost",
+      "category": "typo",
+      "expected": "success",
+      "success": false,
+      "found_count": 1,
+      "elapsed": 5.31284499168396,
+      "books": [
+        {
+          "title": "Radikální otevřenost",
+          "author": "Kim Scottová",
+          "score": 0.6600297391414642,
+          "collection": "books_merged"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BookBot Simple Search - Test Interface</title>
+    <meta charset="UTF-8">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .chat-container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        .header { 
+            background: #28a745; 
+            color: white; 
+            padding: 20px; 
+            border-radius: 10px 10px 0 0; 
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+        .controls { 
+            padding: 20px; 
+            border-bottom: 1px solid #eee; 
+            background: #f8f9fa; 
+        }
+        .control-group { 
+            margin: 10px 0; 
+            display: flex;
+            align-items: center;
+        }
+        .control-group label { 
+            display: inline-block; 
+            width: 120px; 
+            font-weight: bold; 
+        }
+        .control-group input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .messages { 
+            height: 400px; 
+            overflow-y: auto; 
+            padding: 20px; 
+        }
+        .message { 
+            margin: 15px 0; 
+            padding: 15px; 
+            border-radius: 10px; 
+            max-width: 85%; 
+            word-wrap: break-word;
+        }
+        .user { 
+            background: #e3f2fd; 
+            margin-left: auto; 
+            text-align: right; 
+            border: 1px solid #bbdefb;
+        }
+        .bot { 
+            background: #f5f5f5; 
+            border: 1px solid #e0e0e0;
+        }
+        .bot .response {
+            white-space: pre-wrap;
+            margin-bottom: 15px;
+        }
+        .results {
+            margin-top: 15px;
+        }
+        .result-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+        }
+        .result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .result-meta {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .result-score {
+            font-size: 0.8em;
+            color: #28a745;
+            font-weight: bold;
+        }
+        .input-area { 
+            padding: 20px; 
+            border-top: 1px solid #eee; 
+            display: flex; 
+            gap: 10px; 
+        }
+        .input-area input { 
+            flex: 1; 
+            padding: 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .input-area button { 
+            padding: 12px 24px; 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .input-area button:hover {
+            background: #218838;
+        }
+        .input-area button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .status { 
+            padding: 12px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+            display: none; 
+            font-size: 14px;
+        }
+        .status.loading { 
+            background: #cce5ff; 
+            border: 1px solid #80bfff; 
+            color: #004080;
+            display: block;
+        }
+        .status.error { 
+            background: #ffe6e6; 
+            border: 1px solid #ff9999; 
+            color: #800000;
+            display: block;
+        }
+        .debug-info {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 0.8em;
+            color: #666;
+            border-left: 3px solid #28a745;
+        }
+        .quick-queries {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 15px 0;
+        }
+        .quick-query {
+            background: #28a745;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            border: none;
+        }
+        .quick-query:hover {
+            background: #218838;
+        }
+        .approach-comparison {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">
+            <h1>🔍 BookBot Simple Search</h1>
+            <p>Простой векторный поиск с LLM фильтром - альтернативная реализация</p>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="sessionId">Session ID:</label>
+                <input type="text" id="sessionId" value="simple_test_001" />
+            </div>
+            <div class="approach-comparison">
+                <strong>🆚 Сравнение подходов:</strong> 
+                Этот интерфейс использует <strong>/simple_chat</strong> (новый подход) вместо <strong>/chat</strong> (старый BM25+Vector). 
+                Сравните результаты!
+            </div>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="message bot">
+                <div class="response">Добро пожаловать в простой поиск BookBot! 🎉
+
+Новый подход:
+• Простой векторный поиск (без BM25)
+• Асинхронные запросы к books & content коллекциям
+• Merge дубликатов (макс 2 чанка на книгу) 
+• LLM анализирует и фильтрует результаты
+• Понимает сложные запросы: "детективы но не Агата Кристи"
+
+Попробуйте любой запрос или используйте быстрые кнопки ниже!</div>
+                
+                <div class="quick-queries">
+                    <button class="quick-query" onclick="sendQuickQuery('найди книги Орвелла')">📚 Книги Орвелла</button>
+                    <button class="quick-query" onclick="sendQuickQuery('1984')">🔍 1984</button>
+                    <button class="quick-query" onclick="sendQuickQuery('детективы но не Агата Кристи')">🚫 Детективы кроме Кристи</button>
+                    <button class="quick-query" onclick="sendQuickQuery('книги о психологии')">🧠 Психология</button>
+                    <button class="quick-query" onclick="sendQuickQuery('фантастика но не Азимов')">🚀 Фантастика кроме Азимова</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Введите ваш запрос... (например: 'найди книги Толстого')" />
+            <button onclick="sendMessage()" id="sendBtn">Отправить</button>
+        </div>
+    </div>
+
+    <script>
+        let isLoading = false;
+
+        // Отправка сообщения при нажатии Enter
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !isLoading) {
+                sendMessage();
+            }
+        });
+
+        function sendQuickQuery(query) {
+            if (isLoading) return;
+            document.getElementById('messageInput').value = query;
+            sendMessage();
+        }
+
+        async function sendMessage() {
+            if (isLoading) return;
+            
+            const messageInput = document.getElementById('messageInput');
+            const sessionId = document.getElementById('sessionId').value;
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            
+            // Показать пользовательское сообщение
+            addMessage(message, 'user');
+            messageInput.value = '';
+            
+            // Показать статус загрузки
+            setLoading(true);
+            
+            try {
+                const startTime = Date.now();
+                
+                const response = await fetch('/simple_chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        message: message
+                    })
+                });
+                
+                const responseTime = Date.now() - startTime;
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addBotResponse(data, responseTime);
+                } else {
+                    showError(`Ошибка ${response.status}: ${data.error || 'Неизвестная ошибка'}`);
+                }
+                
+            } catch (error) {
+                showError(`Ошибка сети: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function addMessage(text, type) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            if (type === 'user') {
+                messageDiv.innerHTML = `<div>${escapeHtml(text)}</div>`;
+            }
+            
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+            return messageDiv;
+        }
+
+        function addBotResponse(data, responseTime) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot';
+            
+            let html = `<div class="response">${escapeHtml(data.response || 'Нет ответа')}</div>`;
+            
+            // Показать результаты если есть
+            if (data.results && data.results.length > 0) {
+                html += `<div class="results">`;
+                html += `<h4>📚 Найденные книги (${data.results.length}):</h4>`;
+                
+                data.results.forEach((result, index) => {
+                    const title = result.title || 'Unknown';
+                    const author = result.author || 'Unknown';
+                    const score = result.score ? (result.score * 100).toFixed(1) + '%' : 'N/A';
+                    const collection = result.collection || 'unknown';
+                    const year = result.metadata?.year || '';
+                    
+                    html += `<div class="result-item">`;
+                    html += `<div class="result-title">${index + 1}. "${escapeHtml(title)}" - ${escapeHtml(author)}</div>`;
+                    html += `<div class="result-meta">`;
+                    if (year) html += `Год: ${year} • `;
+                    html += `Коллекция: ${collection}`;
+                    html += `</div>`;
+                    html += `<div class="result-score">Релевантность: ${score}</div>`;
+                    html += `</div>`;
+                });
+                
+                html += `</div>`;
+            }
+            
+            // Информация о неточностях если есть
+            if (data.uncertainty_note) {
+                html += `<div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em;">`;
+                html += `<strong>⚠️ Обратите внимание:</strong> ${escapeHtml(data.uncertainty_note)}`;
+                html += `</div>`;
+            }
+
+            // Debug информация
+            html += `<div class="debug-info">`;
+            html += `<strong>🔍 Анализ:</strong> Intent: ${data.intent || 'N/A'} • `;
+            html += `Найдено: ${data.search_stats?.total_found || 0} • `;
+            html += `После фильтра: ${data.search_stats?.after_filter || 0}<br>`;
+            
+            if (data.performance_metrics) {
+                const metrics = data.performance_metrics;
+                html += `<strong>⏱️ Производительность:</strong> `;
+                if (metrics.search_time) html += `Поиск: ${metrics.search_time.toFixed(2)}с • `;
+                if (metrics.filter_time) html += `Фильтр: ${metrics.filter_time.toFixed(2)}с • `;
+                if (metrics.format_time) html += `Формат: ${metrics.format_time.toFixed(2)}с • `;
+                html += `Общее: ${(data.total_execution_time_seconds || responseTime/1000).toFixed(2)}с`;
+            } else {
+                html += `<strong>⏱️ Время ответа:</strong> ${(responseTime/1000).toFixed(2)}с`;
+            }
+            
+            html += `</div>`;
+            
+            messageDiv.innerHTML = html;
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function setLoading(loading) {
+            isLoading = loading;
+            const status = document.getElementById('status');
+            const sendBtn = document.getElementById('sendBtn');
+            
+            if (loading) {
+                status.className = 'status loading';
+                status.textContent = '🔍 Выполняется простой поиск... (векторный поиск + LLM фильтр)';
+                sendBtn.disabled = true;
+                sendBtn.textContent = 'Ждите...';
+            } else {
+                status.style.display = 'none';
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Отправить';
+            }
+        }
+
+        function showError(message) {
+            const status = document.getElementById('status');
+            status.className = 'status error';
+            status.textContent = `❌ ${message}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Автофокус на поле ввода
+        document.getElementById('messageInput').focus();
+    </script>
+</body>
+</html>

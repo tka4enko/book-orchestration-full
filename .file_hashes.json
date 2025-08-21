@@ -1,32 +1,42 @@
 {
-  "92f12c06-f7df-4d05-a0f7-3e1365ed3b41": {
-    "hash": "cb2a3e41d4c298877a8e79d4419f58b64059aa6ba30a60b15dd582a6a1f8a224",
-    "file_path": "/tmp/Wim Hof - Cesta Ledového muže.txt",
-    "timestamp": "2025-08-18T17:26:35.651571"
+  "065e1c5a-6727-48a3-b3a6-e379b8424147": {
+    "hash": "f975bac3962240e23cc9306a1b9a92e5f96942e265d70e30d205311a87086450",
+    "file_path": "/tmp/bookbot_uploads/45d0dea77e304c17849758e9c285e5ec.txt",
+    "timestamp": "2025-08-19T10:15:41.284969"
   },
-  "b6ea1de1-e163-4b52-a7fc-3e85a6e66eba": {
+  "af5da7ce-51fb-45c1-bd38-806a9153ee1d": {
     "hash": "803d86d516ce5a6bd913b592d58a1a46f53b71f7ccfa408e4a4dd6d895960fc3",
     "file_path": "/tmp/1984 (1).txt",
-    "timestamp": "2025-08-18T17:27:15.681920"
+    "timestamp": "2025-08-19T10:21:04.545918"
   },
-  "e41f5ce3-1024-475e-ae04-81a31d2d374c": {
-    "hash": "61ae2c768a908f8d8a96f140f6093b27103567e717951d2bb6c1bb8c8d7a95c8",
-    "file_path": "/tmp/Psychologie peněz_ NADČASOVÉ POZNATKY O BOHATSTVÍ, HAMIŽNOSTI A ŠTĚSTÍ.txt",
-    "timestamp": "2025-08-18T17:27:39.334421"
+  "6dcbf01e-4f4e-41ce-8e65-284ae6c78525": {
+    "hash": "fa28596cae929bfef29ec4e32a1f8b1f2033a1d55f3cfe38f26327d77a023029",
+    "file_path": "/tmp/Jak přelstít ďábla.txt",
+    "timestamp": "2025-08-19T10:22:05.583224"
   },
-  "9684b791-4919-4028-9e6f-54154c18354e": {
-    "hash": "0e1e71915042e1bd74dbe3a1eaad54e69800234aa451a1fe64eedf478316f179",
-    "file_path": "/tmp/Začněte s proč - Simon Sinek (1).txt",
-    "timestamp": "2025-08-18T17:28:34.177612"
-  },
-  "f099301f-6461-4720-8f22-af626e77abf9": {
+  "e078f8f1-81f4-47b6-8256-04e4d230d040": {
     "hash": "2dd964404e6c1d10125e2847a4359faf53e6b1b99f5bb5ed4e58cb885d6773fa",
     "file_path": "/tmp/KBT_Terapeuticka_kniha_pro deti.txt",
-    "timestamp": "2025-08-18T17:29:30.534261"
+    "timestamp": "2025-08-19T11:02:30.734260"
   },
-  "3cfb4372-ab2d-466e-bd2d-8a83b380a245": {
+  "b3fbff9c-3d55-46e2-a5b6-3b628b6f9fc1": {
     "hash": "b04656c5fea8048db701d748578cf332cb4295da70ecac60067694b6a4c0af1c",
     "file_path": "/tmp/Radikální otevřenost – Jak být silným lídrem a přitom neztrácet lidskost.txt",
-    "timestamp": "2025-08-18T17:29:58.132525"
+    "timestamp": "2025-08-19T11:02:50.411282"
+  },
+  "5bc3bdc3-f458-43ea-8255-b5a56cd2c84c": {
+    "hash": "9498605002a54af3832ef7714adba31d3bed5535442f8f539c67595e7ce729bb",
+    "file_path": "/tmp/101 esejů, které změní vaše myšlení.txt",
+    "timestamp": "2025-08-19T11:03:22.154733"
+  },
+  "087761e8-de97-41d8-bd98-8a4a14537b48": {
+    "hash": "407511a043985882ed513acb09450fed4aead5a75bd3a586ac1feac236a925c5",
+    "file_path": "/tmp/Čtyři dohody – Kniha moudrosti starých Toltéků.txt",
+    "timestamp": "2025-08-19T11:06:03.189907"
+  },
+  "bc7fa267-f60f-4f11-a73e-2b66adb52f56": {
+    "hash": "c9dcabe0fbd66a19965015b73f39c91ec5fcee8a969d526612ead171cfde80a2",
+    "file_path": "/tmp/Proč spíme - Matthew Walker.txt",
+    "timestamp": "2025-08-19T11:07:08.195582"
   }
 }

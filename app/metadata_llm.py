@@ -7,6 +7,7 @@ from .metadata import detect_lang, canon
 
 class LLMBookMeta(BaseModel):
     title: Optional[str] = None
+    title_aliases: List[str] = Field(default_factory=list)  # Alternative titles in other languages
     author: Optional[str] = None
     year: Optional[int] = None
     isbn13: Optional[str] = None
@@ -31,6 +32,7 @@ def _sample_text(text: str, max_chars: int = 9000) -> str:
 
 PROMPT = """Extract bibliographic metadata from book text using the provided schema.
 If unknown, return null/[] and DO NOT guess. Prefer explicit mentions (title/copyright/ISBN).
+For title_aliases: include alternative titles in other languages if mentioned (e.g. original vs translated titles).
 Return concise summary (3-5 sentences). Normalize genres/topics to lowercase tokens. Language code: 2 letters.
 """
 

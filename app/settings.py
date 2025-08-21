@@ -44,7 +44,8 @@ SIMILARITY_THRESHOLDS = _load_json_config("SIMILARITY_THRESHOLDS", {
     "topic": 0.4,
     "genre": 0.5,
     "free_text": 0.5,
-    "clarify": 0.3
+    "clarify": 0.3,
+    "mixed_filters": 0.5
 })
 
 # Intent-based BM25 thresholds (loaded from JSON)
@@ -56,7 +57,8 @@ BM25_THRESHOLDS = _load_json_config("BM25_THRESHOLDS", {
     "genre": 0.1,
     "topic": 0.6,
     "free_text": 0.4,
-    "clarify": 0.3
+    "clarify": 0.3,
+    "mixed_filters": 0.4
 })
 
 # safe chunking
@@ -70,3 +72,9 @@ MAX_CHUNKS_PER_BOOK = int(os.getenv("MAX_CHUNKS_PER_BOOK", "2"))
 # Content search diversification settings
 CHUNKS_PER_BOOK_IN_CONTENT = int(os.getenv("CHUNKS_PER_BOOK_IN_CONTENT", "2"))
 CONTENT_SEARCH_EXPAND_K = int(os.getenv("CONTENT_SEARCH_EXPAND_K", "20"))
+
+# Alias extraction threshold - минимальная similarity для извлечения алиасов
+ALIAS_EXTRACTION_THRESHOLD = float(os.getenv("ALIAS_EXTRACTION_THRESHOLD", "0.5"))
+
+# Mixed filters threshold - добавим когда найдем где используется
+# MIXED_FILTERS_THRESHOLD = float(os.getenv("MIXED_FILTERS_THRESHOLD", "0.4"))
