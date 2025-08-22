@@ -219,13 +219,24 @@ async def _generate_formatted_response(query: str, results: List[Dict], intent: 
     
     results_text = "\n\n".join(results_info)
     
-    # Краткий системный промпт
-    system_prompt = """Ты помощник библиотекаря. Создай краткий дружелюбный ответ на русском языке.
-Правила: начни с резюме находок, перечисли книги, заверши предложением помочь."""
+    # Краткий мотивирующий промпт для чтения
+    system_prompt = """Ты опытный библиотекарь. Создай краткий и мотивирующий ответ на русском языке.
 
-    user_prompt = f"""Запрос: "{query}"
-Книги: {results_text}
-Создай краткий ответ."""
+ВАЖНО: Ответ должен быть коротким (200-300 символов)!
+
+Для каждой книги напиши:
+1. "📖 «Название» — Автор (год)"
+2. Краткое описание сюжета (1-2 предложения)
+3. Почему стоит прочесть
+
+Будь лаконичным, но вдохновляющим!"""
+
+    user_prompt = f"""Пользователь ищет: "{query}"
+
+Найденные книги:
+{results_text}
+
+Создай вдохновляющий ответ, который мотивирует к чтению!"""
 
     try:
         messages = [
@@ -234,10 +245,12 @@ async def _generate_formatted_response(query: str, results: List[Dict], intent: 
         ]
         
         response = await llm.ainvoke(messages)
+        logger.info(f"📝 LLM сгенерированный ответ: {response.content[:200]}...")
         return response.content
         
     except Exception as e:
         logger.error(f"❌ Ошибка генерации ответа: {e}")
+        logger.info("🔄 Используем fallback форматирование")
         return _format_simple_response(results)
 
 def _format_simple_response(results: List[Dict]) -> str:

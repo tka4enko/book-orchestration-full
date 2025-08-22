@@ -7,6 +7,7 @@ from pydantic import BaseModel, ValidationError
 from .ingest import ingest_one, books_store, content_store
 from .orchestrator import graph, ChatState
 from .orchestrator_with_chat import graph_with_chat, ChatStateWithChat
+from .orchestrator_chat_agent import chat_agent_graph, ChatAgentState
 from .simple_orchestrator import process_simple_search
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -79,6 +80,12 @@ def chat_test():
 def simple_chat_page():
     """Веб-интерфейс для тестирования простого поиска"""
     with open(os.path.join(os.path.dirname(__file__), "static", "simple_chat.html"), "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
+@app.get("/chat_agent", response_class=HTMLResponse)
+def chat_agent_page():
+    """Веб-интерфейс для тестирования chat-agent"""
+    with open(os.path.join(os.path.dirname(__file__), "static", "chat_agent.html"), "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 @app.post("/chat")
@@ -365,6 +372,81 @@ def search_collection(name: str, q: str = Query(..., min_length=1), k: int = Que
 
 # Хранилище истории чата для сессий
 chat_histories = {}
+
+@app.websocket("/ws/chat_agent")
+async def chat_agent_websocket(websocket: WebSocket):
+    """Новый WebSocket endpoint для chat-agent"""
+    await websocket.accept()
+    
+    try:
+        while True:
+            raw_message = await websocket.receive_json()
+            session_id = raw_message.get("session_id", "default")
+            user_message = raw_message.get("message", "")
+            
+            logger.info(f"🤖 [ChatAgent] Message from {session_id}: '{user_message}'")
+            
+            # Получаем историю для сессии
+            chat_history = chat_histories.get(session_id, [])
+            
+            # Используем новый chat-agent orchestrator
+            state = ChatAgentState(
+                session_id=session_id, 
+                message=user_message, 
+                chat_history=chat_history
+            )
+            result = await chat_agent_graph.ainvoke(state)
+            
+            # Форматируем ответ
+            if hasattr(result, "model_dump"):
+                response_data = result.model_dump()
+            else:
+                response_data = result
+            
+            # Обновляем историю чата
+            if hasattr(result, "chat_history"):
+                chat_histories[session_id] = result.chat_history
+            elif "chat_history" in response_data:
+                chat_histories[session_id] = response_data["chat_history"]
+            
+            # Создаем ответ для фронтенда
+            results = response_data.get("results", [{}])
+            first_result = results[0] if results else {}
+            
+            # Определяем режим работы на основе типа результата
+            result_intent = first_result.get("intent", "chat")
+            mode_type = "unknown"
+            if first_result.get("chat_mode"):
+                mode_type = "chat"
+            elif first_result.get("search_mode"):
+                mode_type = "search"
+            elif first_result.get("recommendation_mode"):
+                mode_type = "recommend"
+            elif first_result.get("clarify_mode"):
+                mode_type = "clarify"
+            
+            # Получаем метрики производительности
+            performance_metrics = response_data.get("performance_metrics", {})
+            total_time = performance_metrics.get("total_time", 0)
+            
+            response = {
+                "reply": first_result.get("message", ""),
+                "cards": [],  # Для будущего расширения
+                "chips": first_result.get("chips", []),
+                "intent": result_intent,
+                "debug": {
+                    "intent": result_intent,
+                    "mode": f"chat_agent_{mode_type}",
+                    "route_taken": mode_type,
+                    "performance_metrics": performance_metrics,
+                    "processing_time": f"{total_time:.1f}ms" if total_time > 0 else "N/A"
+                }
+            }
+            
+            await websocket.send_json(response)
+            
+    except WebSocketDisconnect:
+        logger.info("🤖 [ChatAgent] Client disconnected")
 
 @app.websocket("/ws/chat_test")
 async def chat_test_websocket(websocket: WebSocket):
