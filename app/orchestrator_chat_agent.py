@@ -69,13 +69,13 @@ def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
         # Simple responses based on keywords
         message_lower = state.message.lower()
         
-        if any(greeting in message_lower for greeting in ["привет", "здравствуй", "hello", "hi"]):
+        if any(greeting in message_lower for greeting in ["привет", "здравствуй", "hello", "hi"]):  # Russian: привет=hello, здравствуй=greetings
             reply = "Hello! How are you? How can I help you with books?"
             chips = [
                 {"text": "Find a book", "action": "search"},
                 {"text": "Recommend something", "action": "recommend"}
             ]
-        elif any(phrase in message_lower for phrase in ["не знаю", "скучно", "что делать"]):
+        elif any(phrase in message_lower for phrase in ["не знаю", "скучно", "что делать"]):  # Russian: не знаю=don't know, скучно=boring, что делать=what to do
             reply = "I understand! Maybe let's read something interesting? What genre do you like?"
             chips = [
                 {"text": "Detective", "action": "search"}, 
@@ -104,26 +104,26 @@ def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
         })
         
     except Exception as e:
-        logger.error(f"❌ Ошибка в chat_response_simple: {e}")
+        logger.error(f"❌ Error in chat_response_simple: {e}")
         state.results = [{
-            "message": "Произошла ошибка. Чем могу помочь?",
+            "message": "An error occurred. How can I help?",  # Translated from Russian: Произошла ошибка. Чем могу помочь?
             "intent": "error",
-            "chips": [{"text": "Найти книги", "action": "search"}]
+            "chips": [{"text": "Find books", "action": "search"}]  # Translated from Russian: Найти книги
         }]
     
     execution_time = (time.time() - start_time) * 1000
     state.performance_metrics["chat_response_simple_ms"] = execution_time
-    logger.info(f"⏱️ [chat_agent] Простой чат ответ за {execution_time:.1f}ms")
+    logger.info(f"⏱️ [chat_agent] Simple chat response in {execution_time:.1f}ms")
     
     return state
 
 def node_chat_response(state: ChatAgentState) -> ChatAgentState:
-    """Формирует финальный ответ для чат-режима"""
+    """Forms final response for chat mode"""
     start_time = time.time()
     
-    logger.info("💬 [chat_agent] node_chat_response - Формирование чат ответа...")
+    logger.info("💬 [chat_agent] node_chat_response - Forming chat response...")
     
-    # Формируем структурированный ответ
+    # Form structured response
     state.results = [{
         "message": state.reply_message,
         "intent": "chat",
@@ -133,7 +133,7 @@ def node_chat_response(state: ChatAgentState) -> ChatAgentState:
     
     execution_time = (time.time() - start_time) * 1000
     state.performance_metrics["chat_response_ms"] = execution_time
-    logger.info(f"⏱️ [chat_agent] Чат ответ сформирован за {execution_time:.1f}ms")
+    logger.info(f"⏱️ [chat_agent] Chat response formed in {execution_time:.1f}ms")
     
     return state
 
@@ -247,15 +247,15 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
         execution_time = (time.time() - start_time) * 1000
         state.performance_metrics["recommendations_ms"] = execution_time
         
-        logger.info(f"✅ [chat_agent] Рекомендации сгенерированы за {execution_time:.1f}ms")
+        logger.info(f"✅ [chat_agent] Recommendations generated in {execution_time:.1f}ms")
         
         return state
         
     except Exception as e:
-        logger.error(f"❌ [chat_agent] Ошибка генерации рекомендаций: {e}")
+        logger.error(f"❌ [chat_agent] Recommendation generation error: {e}")
         
-        # Возвращаем ошибку как результат
-        error_message = "Извините, не могу сейчас дать рекомендации. Попробуйте поискать что-то конкретное!"
+        # Return error as result
+        error_message = "Sorry, can't give recommendations now. Try searching for something specific!"  # Translated from Russian: Извините, не могу сейчас дать рекомендации...
         
         state.results = [{
             "message": error_message,
@@ -368,7 +368,7 @@ async def node_simple_search(state: ChatAgentState) -> ChatAgentState:
             "raw_results": search_result.get('results', [])
         }]
         
-        # Добавляем в историю чата
+        # Add to chat history
         if not state.chat_history:
             state.chat_history = []
         
@@ -377,22 +377,22 @@ async def node_simple_search(state: ChatAgentState) -> ChatAgentState:
             "content": message
         })
         
-        # Копируем метрики производительности
+        # Copy performance metrics
         if search_result.get('performance_metrics'):
             state.performance_metrics.update(search_result['performance_metrics'])
         
         execution_time = (time.time() - start_time) * 1000
         state.performance_metrics["simple_search_ms"] = execution_time
         
-        logger.info(f"✅ [chat_agent] Простой поиск завершен за {execution_time:.1f}ms")
+        logger.info(f"✅ [chat_agent] Simple search completed in {execution_time:.1f}ms")
         
         return state
         
     except Exception as e:
-        logger.error(f"❌ [chat_agent] Ошибка простого поиска: {e}")
+        logger.error(f"❌ [chat_agent] Simple search error: {e}")
         
-        # Возвращаем ошибку как результат
-        error_message = "Извините, произошла ошибка при поиске. Попробуйте переформулировать запрос."
+        # Return error as result
+        error_message = "Sorry, a search error occurred. Try rephrasing your query."  # Translated from Russian: Извините, произошла ошибка при поиске...
         
         state.results = [{
             "message": error_message,
@@ -406,7 +406,7 @@ async def node_simple_search(state: ChatAgentState) -> ChatAgentState:
         return state
 
 def node_clarify(state: ChatAgentState) -> ChatAgentState:
-    """Запрашивает уточнение у пользователя"""
+    """Requests clarification from user"""
     start_time = time.time()
     
     logger.info("❓ [chat_agent] node_clarify - Clarification request...")
@@ -424,7 +424,7 @@ def node_clarify(state: ChatAgentState) -> ChatAgentState:
         # Form response with clarification request
         message_lower = state.message.lower()
         
-        if any(word in message_lower for word in ["найти", "найду", "ищу", "поиск"]):
+        if any(word in message_lower for word in ["найти", "найду", "ищу", "поиск"]):  # Russian: найти=find, найду=will find, ищу=searching, поиск=search
             reply = "What exactly do you want to find? Specify author, book title or genre."
             chips = [
                 {"text": "Author", "action": "search"},
@@ -432,7 +432,7 @@ def node_clarify(state: ChatAgentState) -> ChatAgentState:
                 {"text": "Genre", "action": "search"},
                 {"text": "Recommend yourself", "action": "recommend"}
             ]
-        elif any(word in message_lower for word in ["книг", "читать", "литератур"]):
+        elif any(word in message_lower for word in ["книг", "читать", "литератур"]):  # Russian: книг=books, читать=read, литератур=literature
             reply = "What type of books interest you? You can specify genre or specific preferences."
             chips = [
                 {"text": "Fantasy", "action": "search"},
@@ -508,6 +508,6 @@ builder.add_edge("recommendations", END)
 builder.add_edge("simple_search", END)
 builder.add_edge("clarify", END)
 
-# Компилируем граф с checkpointer для сохранения состояния между вызовами
+# Compile graph with checkpointer for state preservation between calls
 memory = MemorySaver()
 chat_agent_graph = builder.compile(checkpointer=memory)

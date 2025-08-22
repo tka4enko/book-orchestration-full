@@ -150,7 +150,7 @@ def _get_pattern_analysis_details(query: str) -> Dict[str, Any]:
         ("ISBN+author", r'isbn\s+[\d-]+\s+by\s+'),
         ("Year range", r'\d{4}\.\.\d{4}'),
         ("Published pattern", r'published\s+(after|before)'),
-        ("Exclusion words", r'\b(?:but\s+not|except|excluding|without|но\s+не|кроме|исключая)\s+\w+'),
+        ("Exclusion words", r'\b(?:but\s+not|except|excluding|without|но\s+не|кроме|исключая)\s+\w+'),  # Russian: но не, кроме, исключая
     ]
     
     for pattern_name, pattern in patterns:
@@ -176,7 +176,7 @@ def _get_pattern_analysis_details(query: str) -> Dict[str, Any]:
 INTENT_SYS = """You are an intent router for a book search assistant.
 Decide one intent: isbn | author_title | author | title | genre | topic | negative_filter | year_range | mixed_filters | free_text | clarify.
 
-CRITICAL: Use negative_filter for ANY query with exclusion words like NOT, but, except, excluding, without, не про, но не, кроме, исключая!
+CRITICAL: Use negative_filter for ANY query with exclusion words like NOT, but, except, excluding, without, не про, но не, кроме, исключая! (Russian exclusion words)
 
 Examples:
 - "SomeBook Author Name" → author_title (NOT mixed_filters)
@@ -188,8 +188,8 @@ Examples:
 - "self-help NOT spirituality" → negative_filter (has NOT)
 - "books about love but not romance" → negative_filter (has "but not")
 - "science books except fiction" → negative_filter (has "except")
-- "книги про медицину но не про хирургию" → negative_filter (has "но не")
-- "Дай книгу по самодисциплине, но не про духовность" → negative_filter (has "но не про")
+- "книги про медицину но не про хирургию" → negative_filter (has "но не")  # Russian: books about medicine but not surgery
+- "Дай книгу по самодисциплине, но не про духовность" → negative_filter (has "но не про")  # Russian: Give me a book on self-discipline but not about spirituality
 - "A book about Big Brother and censorship but not science fiction" → negative_filter (has "but not")
 - "books from 2020-2024" → year_range
 - "title:\"Book\" author:\"Name\"" → mixed_filters (DSL syntax)
@@ -197,7 +197,7 @@ Examples:
 
 negative_filter is for ANY query with exclusion/negation patterns:
 - English: NOT, but not, except, without, excluding, minus
-- Russian: не про, но не, кроме, исключая, минус
+- Russian: не про, но не, кроме, исключая, минус  # Russian exclusion words
 - Czech: ale ne, kromě, bez
 
 mixed_filters is ONLY for:
@@ -439,7 +439,7 @@ def _check_author_title_conflicts(state: ChatState, results: List[Dict]) -> Chat
         if title_similarity > 70 and author_similarity < 60:
             logger.info("⚠️ [orchestrator.py] CONFLICT DETECTED: Title match but author mismatch")
             state.need_clarify = True
-            state.clarify_question = f"Вы имели в виду «{result.get('title')}» от {result.get('author')}? (В запросе указан автор: {state.filters.get('author')})"
+            state.clarify_question = f"Did you mean '{result.get('title')}' by {result.get('author')}? (Author specified in query: {state.filters.get('author')})"
             # Still include the result but mark for clarification
             state.results = [result]
             return state
@@ -575,13 +575,13 @@ def _check_mixed_filters_consistency(state: ChatState, payload: List[Dict]) -> C
             primary_conflict = conflicts[0]
             
             if "ISBN" in primary_conflict:
-                state.clarify_question = f"ISBN {isbn} принадлежит книге '{book_title}' от {book_author}. Вы имели в виду эту книгу, а не автора {author}?"
+                state.clarify_question = f"ISBN {isbn} belongs to book '{book_title}' by {book_author}. Did you mean this book, not the author {author}?"
             elif "Author" in primary_conflict:
-                state.clarify_question = f"Найдена книга '{book_title}' от {book_author}. Вы имели в виду этого автора, а не {author}?"
+                state.clarify_question = f"Found book '{book_title}' by {book_author}. Did you mean this author, not {author}?"
             elif "Genre" in primary_conflict:
-                state.clarify_question = f"Книга '{book_title}' относится к жанру '{book_genre}', а не '{primary_genre}'. Вы искали именно эту книгу?"
+                state.clarify_question = f"Book '{book_title}' belongs to genre '{book_genre}', not '{primary_genre}'. Were you looking for this specific book?"
             else:
-                state.clarify_question = f"Найдено несоответствие: {primary_conflict}. Уточните запрос."
+                state.clarify_question = f"Found discrepancy: {primary_conflict}. Please clarify your query."
             
             # Return only the conflicting result for user to confirm
             state.results = [result]
@@ -676,7 +676,7 @@ def node_route_search(state: ChatState) -> ChatState:
                     logger.info("⚠️ [orchestrator.py] ISBN CONFLICT: Author mismatch detected")
                     add_debug_issue(f"ISBN author conflict: expected '{query_author}', found '{db_author}' (similarity: {author_similarity}%)")
                     state.need_clarify = True
-                    state.clarify_question = f"ISBN {state.filters.get('isbn13')} принадлежит книге «{result.get('title')}» от {result.get('author')}, но в запросе указан {state.filters['author']}. Вы имели в виду эту книгу?"
+                    state.clarify_question = f"ISBN {state.filters.get('isbn13')} belongs to book '{result.get('title')}' by {result.get('author')}, but query specifies {state.filters['author']}. Did you mean this book?"
             
             state.results = payload
         else:
@@ -751,8 +751,8 @@ def node_route_search(state: ChatState) -> ChatState:
                 logger.info(f"    📋 Doc {i}: '{title}' -> predicate_filter: {filter_result}")
                 
                 # Record detailed filtering decision for debug
-                action = "ПРИНЯТА" if filter_result else "ОТКЛОНЕНА"
-                reason = "Соответствует фильтрам mixed_filters" if filter_result else "Не соответствует фильтрам mixed_filters"
+                action = "ACCEPTED" if filter_result else "REJECTED"
+                reason = "Matches mixed_filters criteria" if filter_result else "Does not match mixed_filters criteria"
                 add_debug_filtered_result({
                     "action": action,
                     "reason": reason,
@@ -889,7 +889,7 @@ def node_route_search(state: ChatState) -> ChatState:
             logger.info("⚠️ [orchestrator.py] CONFLICT DETECTED: Title match but author mismatch")
             conflict = potential_conflicts[0]
             state.need_clarify = True
-            state.clarify_question = f"Вы имели в виду «{conflict.get('title')}» от {conflict.get('author')}? (В запросе указан автор: {f.get('author')})"
+            state.clarify_question = f"Did you mean '{conflict.get('title')}' by {conflict.get('author')}? (Author specified in query: {f.get('author')})"
             state.results = [conflict]
         else:
             logger.info("    ❌ No matches found with fuzzy matching")
@@ -949,7 +949,7 @@ def node_answer(state: ChatState) -> ChatState:
     # Handle empty results
     if not state.results:
         logger.info("🚫 [orchestrator.py] No results found - generating 'not found' message")
-        no_results_msg = f"К сожалению, не найдено книг, соответствующих вашему запросу '{state.message}'. Попробуйте изменить запрос или загрузить больше книг."
+        no_results_msg = f"Sorry, no books found matching your query '{state.message}'. Try modifying your query or uploading more books."
         state.results = [{"message": no_results_msg, "intent": state.intent}]
         logger.info("    📝 Generated: 'No results found' message")
         

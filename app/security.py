@@ -57,7 +57,7 @@ class SecurityConfig:
     
     # Educational/legitimate contexts that should not be blocked
     EDUCATIONAL_CONTEXTS = [
-        r'что\s+такое\s+jailbreak',
+        r'что\s+такое\s+jailbreak',  # Russian: what is jailbreak
         r'explain\s+jailbreak',
         r'define\s+jailbreak',
         r'about\s+jailbreak',

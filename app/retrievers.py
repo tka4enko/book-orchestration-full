@@ -55,9 +55,9 @@ def clear_normalization_cache():
     logger.info("🔧 Normalization cache cleared")
 
 async def async_bm25_search(bm25_retriever, query: str, search_queries: List[str]) -> tuple:
-    """Асинхронный BM25 поиск"""
+    """Asynchronous BM25 search"""
     try:
-        # Выполняем BM25 поиск в отдельном потоке
+        # Execute BM25 search in separate thread
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(_perform_bm25_search, bm25_retriever, query, search_queries)
@@ -68,7 +68,7 @@ async def async_bm25_search(bm25_retriever, query: str, search_queries: List[str
         return [], {}, 0.0
 
 async def async_vector_books_search(query: str, bm25_doc_ids: set, k: int = 8) -> tuple:
-    """Асинхронный векторный поиск в книгах"""
+    """Asynchronous vector search in books"""
     try:
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -80,7 +80,7 @@ async def async_vector_books_search(query: str, bm25_doc_ids: set, k: int = 8) -
         return [], 0.0
 
 async def async_vector_content_search(query: str, k: int = 20) -> tuple:
-    """Асинхронный векторный поиск в контенте"""
+    """Asynchronous vector search in content"""
     try:
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -92,7 +92,7 @@ async def async_vector_content_search(query: str, k: int = 20) -> tuple:
         return [], 0.0
 
 def _perform_bm25_search(bm25_retriever, query: str, search_queries: List[str]) -> tuple:
-    """Синхронный BM25 поиск для выполнения в отдельном потоке"""
+    """Synchronous BM25 search for execution in separate thread"""
     import time
     bm25_start_time = time.time()
     bm25_docs = []
@@ -106,7 +106,7 @@ def _perform_bm25_search(bm25_retriever, query: str, search_queries: List[str]) 
             query_time = (time.time() - query_start) * 1000
             bm25_detailed_times.append(("Single query", query_time))
             
-            # Обрабатываем результаты
+            # Process results
             for doc in docs:
                 if doc.metadata.get('document_id') not in bm25_doc_ids:
                     bm25_docs.append(doc)
@@ -119,7 +119,7 @@ def _perform_bm25_search(bm25_retriever, query: str, search_queries: List[str]) 
     return bm25_docs, bm25_doc_ids, pure_bm25_time
 
 def _perform_vector_books_search(query: str, bm25_doc_ids: set, k: int = 8) -> tuple:
-    """Синхронный векторный поиск в книгах для выполнения в отдельном потоке"""
+    """Synchronous vector search in books for execution in separate thread"""
     import time
     vector_books_start = time.time()
     
@@ -127,7 +127,7 @@ def _perform_vector_books_search(query: str, bm25_doc_ids: set, k: int = 8) -> t
         store = books_store()
         results = store.similarity_search_with_score(query, k=k)
         
-        # Фильтруем результаты, исключая найденные BM25
+        # Filter results, excluding BM25 found ones
         filtered_results = []
         for doc, distance in results:
             if doc.metadata.get('document_id') not in bm25_doc_ids:
@@ -141,17 +141,17 @@ def _perform_vector_books_search(query: str, bm25_doc_ids: set, k: int = 8) -> t
         return [], 0.0
 
 def _perform_vector_content_search(query: str, k: int = 20) -> tuple:
-    """Синхронный векторный поиск в контенте для выполнения в отдельном потоке"""
+    """Synchronous vector search in content for execution in separate thread"""
     import time
     vector_content_start = time.time()
     
     try:
         store = content_store()
-        # Расширяем поиск для диверсификации
+        # Expand search for diversification
         expanded_k = min(k * CONTENT_SEARCH_EXPAND_K, 50)
         results = store.similarity_search_with_score(query, k=expanded_k)
         
-        # Диверсифицируем результаты
+        # Diversify results
         diversified_results = _diversify_content_results(results, max_chunks_per_book=2, limit=k)
         
         vector_content_time = (time.time() - vector_content_start) * 1000
@@ -162,7 +162,7 @@ def _perform_vector_content_search(query: str, k: int = 20) -> tuple:
         return [], 0.0
 
 def _diversify_content_results(results: List[tuple], max_chunks_per_book: int = 2, limit: int = 6) -> List[tuple]:
-    """Диверсифицирует результаты контента, ограничивая количество чанков на книгу"""
+    """Diversifies content results, limiting the number of chunks per book"""
     import time
     book_chunks = {}
     
@@ -174,11 +174,11 @@ def _diversify_content_results(results: List[tuple], max_chunks_per_book: int = 
     
     diversified = []
     for book_id, chunks in book_chunks.items():
-        # Берем лучшие чанки для каждой книги
+        # Take best chunks for each book
         best_chunks = sorted(chunks, key=lambda x: x[1])[:max_chunks_per_book]
         diversified.extend(best_chunks)
     
-    # Сортируем по расстоянию и ограничиваем общее количество
+    # Sort by distance and limit total count
     diversified.sort(key=lambda x: x[1])
     return diversified[:limit]
 
@@ -279,15 +279,15 @@ def isbn_exact(query: str) -> List[Document]:
     
     b = books_store()._collection
     
-    # Поиск по обоим ISBN форматам
+    # Search by both ISBN formats
     found_isbn13 = b.get(where={"isbn13": norm["isbn13"]}, include=["documents","metadatas"])
     found_isbn10 = b.get(where={"isbn10": norm["isbn10"]}, include=["documents","metadatas"]) if norm["isbn10"] else {"documents": [], "metadatas": []}
     
-    # Объединяем результаты, избегая дубликатов
+    # Combine results, avoiding duplicates
     all_docs = (found_isbn13.get("documents") or []) + (found_isbn10.get("documents") or [])
     all_metas = (found_isbn13.get("metadatas") or []) + (found_isbn10.get("metadatas") or [])
     
-    # Убираем дубликаты по document_id
+    # Remove duplicates by document_id
     seen_ids = set()
     unique_docs = []
     unique_metas = []
@@ -611,14 +611,14 @@ class OptimizedThresholdRetriever:
         return final_docs
     
     def invoke(self, query: str, intent: str = "free_text", title_aliases: Optional[List[str]] = None, normalized_query_tokens: Optional[List[str]] = None) -> List[Document]:
-        """Оптимизированная синхронная версия invoke"""
+        """Optimized synchronous version of invoke"""
         return self._invoke_sync(query, intent, title_aliases, normalized_query_tokens)
 
     def _invoke_sync(self, query: str, intent: str = "free_text", title_aliases: Optional[List[str]] = None, normalized_query_tokens: Optional[List[str]] = None) -> List[Document]:
-        """Оптимизированная синхронная версия invoke"""
+        """Optimized synchronous version of invoke"""
         import time
         
-        # Инициализация и нормализация
+        # Initialization and normalization
         logger.warning(f"🔍 DEBUG Step 1: About to normalize query: '{query}'")
         normalize_start = time.time()
         normalized_query_tokens = normalize_text(query)
@@ -628,8 +628,8 @@ class OptimizedThresholdRetriever:
         
         # Record normalized queries for debug
         set_debug_search_queries(
-            bm25_query=f"Исходный: '{query}' → Нормализованный: '{normalized_query_str}'",
-            vector_query=f"Исходный: '{query}' (векторный поиск без нормализации)"
+            bm25_query=f"Original: '{query}' → Normalized: '{normalized_query_str}'",
+            vector_query=f"Original: '{query}' (vector search without normalization)"
         )
         
         # Check for empty query immediately
@@ -711,7 +711,7 @@ class OptimizedThresholdRetriever:
                         
                         variant_time = (time.time() - variant_start) * 1000
                         bm25_detailed_times.append(f"Variant {i+1} '{search_q}': {variant_time:.1f}ms")
-                        logger.warning(f"        ⏱️ BM25 variant #{i+1} время: {variant_time:.1f}ms")
+                        logger.warning(f"        ⏱️ BM25 variant #{i+1} time: {variant_time:.1f}ms")
                         
                         # Add unique results only
                         added = 0
@@ -778,7 +778,7 @@ class OptimizedThresholdRetriever:
         bm25_total_time = (time.time() - bm25_start_time) * 1000
         # Calculate pure BM25 search time (excluding processing)
         pure_bm25_time = sum([float(t.split(': ')[1].replace('ms', '')) for t in bm25_detailed_times if 'query' in t or 'scores' in t])
-        logger.warning(f"⏱️ BM25 ДЕТАЛЬНОЕ ВРЕМЯ: {bm25_total_time:.1f}ms общее")
+        logger.warning(f"⏱️ BM25 DETAILED TIME: {bm25_total_time:.1f}ms total")
         for detail in bm25_detailed_times:
             logger.warning(f"   {detail}")
         logger.warning(f"   Pure BM25 search time: {pure_bm25_time:.1f}ms")
@@ -792,17 +792,17 @@ class OptimizedThresholdRetriever:
             logger.info(f"    ⏭️  Step 2: Skipping vector search (BM25 sufficient for intent '{intent}')")
             # Update debug with vector search being skipped
             set_debug_search_queries(
-                vector_query=f"Векторный поиск ПРОПУЩЕН для intent '{intent}' (BM25 достаточно)"
+                vector_query=f"Vector search SKIPPED for intent '{intent}' (BM25 sufficient)"
             )
         else:
             vector_books_start_time = time.time()
             logger.info("    📊 Step 2: Vector search in books collection (with BM25 exclusions)...")
             # Update debug with actual vector query
             set_debug_search_queries(
-                vector_query=f"Исходный: '{query}' (векторный поиск БЕЗ нормализации, с исключением {len(bm25_doc_ids)} BM25 результатов)"
+                vector_query=f"Original: '{query}' (vector search WITHOUT normalization, excluding {len(bm25_doc_ids)} BM25 results)"
             )
             books_results_raw = vector_books_with_scores(query, k=VEC_BOOKS_K)
-            logger.info(f"        📊 Raw vector search found {len(books_results_raw)} books")
+        # CLEANED: logger.info(f"        📊 Raw vector search found {len(books_results_raw)} books")
             
             # Log what will be excluded
             excluded_count = 0
@@ -816,10 +816,10 @@ class OptimizedThresholdRetriever:
                 similarity = max(0.0, 1.0 - (dist / 2.0))
                 
                 if doc_id in bm25_doc_ids:
-                    logger.info(f"        ❌ EXCLUDED: '{title}' by {author} (found by BM25, similarity: {similarity:.3f})")
+        # CLEANED: logger.info(f"        ❌ EXCLUDED: '{title}' by {author} (found by BM25, similarity: {similarity:.3f})")
                     excluded_count += 1
                 else:
-                    logger.info(f"        ✅ KEPT: '{title}' by {author} (not in BM25, similarity: {similarity:.3f})")
+        # CLEANED: logger.info(f"        ✅ KEPT: '{title}' by {author} (not in BM25, similarity: {similarity:.3f})")
                     kept_results.append((doc, dist))
             
             books_results = kept_results
@@ -955,13 +955,13 @@ class OptimizedThresholdRetriever:
         
         # Log initialization breakdown
         if 'normalize_time' in locals() or 'lang_time' in locals():
-            logger.info(f"    📊 ИНИЦИАЛИЗАЦИЯ:")
+            logger.info(f"    📊 INITIALIZATION:")
             if 'normalize_time' in locals():
-                logger.info(f"       ├─ Нормализация запроса: {normalize_time:.1f}ms")
+                logger.info(f"       ├─ Query normalization: {normalize_time:.1f}ms")
             if 'lang_time' in locals():
-                logger.info(f"       └─ Определение языка: {lang_time:.1f}ms")
+                logger.info(f"       └─ Language detection: {lang_time:.1f}ms")
             total_init = search_metrics["initialization_ms"]
-            logger.info(f"       📊 Общее время инициализации: {total_init:.1f}ms")
+            logger.info(f"       📊 Total initialization time: {total_init:.1f}ms")
         
         logger.info(f"    📊 SEARCH METRICS: {search_metrics}")
         logger.info(f"    📊 Retrieved {len(final_docs)} documents after similarity filtering")
@@ -972,7 +972,7 @@ class OptimizedThresholdRetriever:
         return final_docs
     
     def _deduplicate_documents(self, documents: List[Document]) -> List[Document]:
-        """Применяет smart deduplication к списку документов."""
+        """Applies smart deduplication to a list of documents."""
         if not documents:
             return documents
             

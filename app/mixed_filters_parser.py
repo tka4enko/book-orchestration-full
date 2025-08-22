@@ -57,7 +57,7 @@ class MixedFiltersParser:
             api_key=OPENAI_API_KEY
         ) if OPENAI_API_KEY else None
         
-        # JSON-детерминированный LLM для строгого парсинга
+        # JSON-deterministic LLM for strict parsing
         self.json_llm = ChatOpenAI(
             model=OPENAI_MODEL_CHAT,
             temperature=0,
@@ -116,7 +116,7 @@ class MixedFiltersParser:
         has_quotes_and_by = '"' in query and ' by ' in query.lower()
         has_isbn_and_author = re.search(r'isbn\s*[:\s]*[\d-]+.*by\s+\w+', query, re.IGNORECASE)
         
-        # НОВОЕ: Detect potential author+title patterns (natural language) - but be more specific
+        # NEW: Detect potential author+title patterns (natural language) - but be more specific
         words = query.strip().split()
         has_author_title_pattern = False
         if 2 <= len(words) <= 6:  # Reasonable length for author+title
@@ -211,7 +211,7 @@ class MixedFiltersParser:
             r'except\s+([^\s,]+)',
             r'exclude\s+([^\s,]+)',
             r'-([^\s,]+)',
-            r'но\s+не\s+([^\s,]+)',
+            r'но\s+не\s+([^\s,]+)',  # Russian: но не
         ]
         
         for pattern in not_patterns:

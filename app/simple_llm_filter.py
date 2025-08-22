@@ -88,7 +88,7 @@ MATCHING CRITERIA:
 - ALL elements specified in the query must match
 - Check reality of combinations (Lovecraft + romance = impossible)
 - In conflicts (author A + work by author B) = reject
-- Consider synonyms and translations (Oуэрелл = Orwell)
+- Consider synonyms and translations (Orwell in different languages)
 
 PRINCIPLE: High accuracy is more important than completeness. Better not to find than to find incorrectly.
 

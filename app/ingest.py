@@ -182,7 +182,7 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
     
     # Add author for author-based searches
     if master_meta.get("author"):
-        author_part = f"Автор: {master_meta['author']}"
+        author_part = f"Author: {master_meta['author']}"
         parts.append(author_part)
         logger.info(f"📝 Step 3 - Author: Added '{author_part}'")
     else:
@@ -190,7 +190,7 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
     
     # Add year for year-based searches  
     if master_meta.get("year"):
-        year_part = f"Год: {master_meta['year']}"
+        year_part = f"Year: {master_meta['year']}"
         parts.append(year_part)
         logger.info(f"📝 Step 4 - Year: Added '{year_part}'")
     else:
@@ -226,7 +226,7 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
             logger.info(f"📝 Step 5b - Added other type as string: {secondary}")
     
     if genres:
-        genre_part = f"Жанр: {', '.join(genres)}"
+        genre_part = f"Genre: {', '.join(genres)}"
         parts.append(genre_part)
         logger.info(f"📝 Step 5 - Genres: Added '{genre_part}'")
     else:
@@ -271,7 +271,7 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
             topics.append(str(mentioned))
     
     if topics:
-        topics_part = f"Темы: {', '.join(topics[:10])}"  # Limit to first 10 topics to avoid too long text
+        topics_part = f"Topics: {', '.join(topics[:10])}"  # Limit to first 10 topics to avoid too long text
         parts.append(topics_part)
         logger.info(f"📝 Step 6 - Topics: Added '{topics_part}' (from {len(topics)} total topics)")
     else:

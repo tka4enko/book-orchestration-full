@@ -64,7 +64,7 @@ async def security_middleware(request: Request, call_next):
     client_ip = get_client_ip(request)
     
     # Log request
-    logger.debug(f"🔒 Request from {client_ip}: {request.method} {request.url.path}")
+        # CLEANED: logger.debug(f"🔒 Request from {client_ip}: {request.method} {request.url.path}")
     
     try:
         response = await call_next(request)

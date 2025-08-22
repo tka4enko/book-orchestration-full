@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BookBot Chat Agent - Тест</title>
+    <title>BookBot Chat Agent - Test</title>
     <style>
         * {
             box-sizing: border-box;
@@ -237,20 +237,20 @@
     <div class="chat-container">
         <div class="chat-header">
             <h1>🤖 BookBot Chat Agent</h1>
-            <p>Умный помощник: общение + поиск книг</p>
+            <p>Smart assistant: chat + book search</p>
         </div>
 
-        <div class="connection-status" id="connectionStatus">Подключение...</div>
+        <div class="connection-status" id="connectionStatus">Connecting...</div>
 
         <div class="messages-container" id="messagesContainer">
             <div class="system-message">
-                Привет! Я ChatAgent - умный помощник BookBot. Могу как поговорить, так и найти интересные книги для тебя! 📚
+                Hello! I'm ChatAgent - BookBot's smart assistant. I can both chat and find interesting books for you! 📚
             </div>
         </div>
 
         <div class="typing-indicator" id="typingIndicator">
             <div class="message-content">
-                ChatAgent печатает
+                ChatAgent is typing
                 <div class="typing-dots">
                     <span></span>
                     <span></span>
@@ -265,10 +265,10 @@
                     type="text" 
                     id="messageInput" 
                     class="message-input" 
-                    placeholder="Напиши что-нибудь или попроси найти книги..."
+                    placeholder="Write something or ask to find books..."
                     maxlength="500"
                 >
-                <button id="sendButton" class="send-button">Отправить</button>
+                <button id="sendButton" class="send-button">Send</button>
             </div>
         </div>
     </div>
@@ -306,11 +306,11 @@
                     this.ws = new WebSocket(wsUrl);
                     
                     this.ws.onopen = () => {
-                        console.log('🤖 ChatAgent WebSocket подключен');
+                        console.log('🤖 ChatAgent WebSocket connected');
                         this.isConnected = true;
                         this.updateConnectionStatus('connected');
                         
-                        // Отправляем накопленные сообщения
+                        // Send queued messages
                         while (this.messageQueue.length > 0) {
                             this.ws.send(this.messageQueue.shift());
                         }
@@ -318,29 +318,29 @@
                     
                     this.ws.onmessage = (event) => {
                         const data = JSON.parse(event.data);
-                        console.log('📨 Ответ от ChatAgent:', data);
+                        console.log('📨 Response from ChatAgent:', data);
                         this.handleResponse(data);
                     };
                     
                     this.ws.onclose = (event) => {
-                        console.log('🔌 ChatAgent WebSocket закрыт:', event.code, event.reason);
+                        console.log('🔌 ChatAgent WebSocket closed:', event.code, event.reason);
                         this.isConnected = false;
                         this.updateConnectionStatus('disconnected');
                         
-                        // Переподключение через 3 секунды
+                        // Reconnect in 3 seconds
                         setTimeout(() => {
-                            console.log('🔄 Переподключение...');
+                            console.log('🔄 Reconnecting...');
                             this.connect();
                         }, 3000);
                     };
                     
                     this.ws.onerror = (error) => {
-                        console.error('❌ Ошибка WebSocket:', error);
+                        console.error('❌ WebSocket error:', error);
                         this.updateConnectionStatus('disconnected');
                     };
                     
                 } catch (error) {
-                    console.error('❌ Ошибка создания WebSocket:', error);
+                    console.error('❌ WebSocket creation error:', error);
                     this.updateConnectionStatus('disconnected');
                 }
             }
@@ -349,10 +349,10 @@
                 this.connectionStatus.className = `connection-status ${status}`;
                 
                 if (status === 'connected') {
-                    this.connectionStatus.textContent = '✅ Подключен к ChatAgent';
+                    this.connectionStatus.textContent = '✅ Connected to ChatAgent';
                     this.sendButton.disabled = false;
                 } else {
-                    this.connectionStatus.textContent = '❌ Нет соединения (переподключение...)';
+                    this.connectionStatus.textContent = '❌ No connection (reconnecting...)';
                     this.sendButton.disabled = true;
                 }
             }
@@ -367,7 +367,7 @@
                     }
                 });
 
-                // Auto-focus на инпут
+                // Auto-focus on input
                 this.messageInput.focus();
             }
 
@@ -376,15 +376,15 @@
                 
                 if (!message) return;
                 
-                // Показываем сообщение пользователя
+                // Show user message
                 this.addMessage('user', message);
                 
-                // Очищаем инпут только если сообщение введено вручную
+                // Clear input only if message was entered manually
                 if (!messageText) {
                     this.messageInput.value = '';
                 }
                 
-                // Показываем индикатор печатания
+                // Show typing indicator
                 this.showTypingIndicator();
                 
                 const payload = {
@@ -395,7 +395,7 @@
                 if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
                     this.ws.send(JSON.stringify(payload));
                 } else {
-                    console.log('📝 Сообщение добавлено в очередь');
+                    console.log('📝 Message added to queue');
                     this.messageQueue.push(JSON.stringify(payload));
                 }
             }
@@ -403,10 +403,10 @@
             handleResponse(data) {
                 this.hideTypingIndicator();
                 
-                // Добавляем ответ бота
+                // Add bot response
                 this.addMessage('bot', data.reply, data.chips, data.debug);
                 
-                // Фокус обратно на инпут
+                // Focus back on input
                 this.messageInput.focus();
             }
 
@@ -420,7 +420,7 @@
                 
                 messageDiv.appendChild(contentDiv);
                 
-                // Добавляем чипсы для сообщений бота
+                // Add chips for bot messages
                 if (sender === 'bot' && chips && chips.length > 0) {
                     const chipsContainer = document.createElement('div');
                     chipsContainer.className = 'chips-container';
@@ -438,7 +438,7 @@
                     messageDiv.appendChild(chipsContainer);
                 }
                 
-                // Добавляем debug информацию для сообщений бота
+                // Add debug info for bot messages
                 if (sender === 'bot' && debug) {
                     const debugDiv = document.createElement('div');
                     debugDiv.className = 'debug-info';
@@ -472,7 +472,7 @@
             }
         }
 
-        // Инициализация при загрузке страницы
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
             new ChatAgent();
         });

@@ -105,15 +105,15 @@
     <div class="chat-container">
         <div class="header">
             <h1>🧪 BookBot Chat Test</h1>
-            <p>Тестирование нового orchestrator с чатом</p>
+            <p>Testing new orchestrator with chat</p>
         </div>
         
         <div class="controls">
             <div class="control-group">
-                <label>Режим:</label>
+                <label>Mode:</label>
                 <select id="modeSelect">
-                    <option value="chat">Чат + Поиск</option>
-                    <option value="original">Оригинальный поиск</option>
+                    <option value="chat">Chat + Search</option>
+                    <option value="original">Original Search</option>
                 </select>
             </div>
             <div class="control-group">
@@ -121,22 +121,22 @@
                 <input type="text" id="sessionId" value="test-session" style="width: 200px;">
             </div>
             <div class="control-group">
-                <label>Тестовые сообщения:</label>
-                <button onclick="sendTestMessage('Привет!')">Привет</button>
-                <button onclick="sendTestMessage('Найди книги по психологии')">Поиск книг</button>
-                <button onclick="sendTestMessage('Расскажи о погоде')">О погоде</button>
+                <label>Test Messages:</label>
+                <button onclick="sendTestMessage('Hello!')">Hello</button>
+                <button onclick="sendTestMessage('Find books on psychology')">Search Books</button>
+                <button onclick="sendTestMessage('Tell me about weather')">About Weather</button>
             </div>
         </div>
         
         <div id="status" class="status">
-            <span id="statusText">Подключение...</span>
+            <span id="statusText">Connecting...</span>
         </div>
         
         <div id="messages" class="messages"></div>
         
         <div class="input-area">
-            <input type="text" id="messageInput" placeholder="Напишите сообщение..." disabled>
-            <button onclick="sendMessage()" id="sendButton" disabled>Отправить</button>
+            <input type="text" id="messageInput" placeholder="Write a message..." disabled>
+            <button onclick="sendMessage()" id="sendButton" disabled>Send</button>
         </div>
     </div>
 
@@ -162,20 +162,20 @@
             ws = new WebSocket(`ws://localhost:8000${endpoint}`);
 
             ws.onopen = function() {
-                updateStatus(`✅ Подключено к ${endpoint}`);
+                updateStatus(`✅ Connected to ${endpoint}`);
                 messageInput.disabled = false;
                 sendButton.disabled = false;
                 messageInput.focus();
             };
 
             ws.onclose = function() {
-                updateStatus('❌ Соединение потеряно', true);
+                updateStatus('❌ Connection lost', true);
                 messageInput.disabled = true;
                 sendButton.disabled = true;
             };
 
             ws.onerror = function() {
-                updateStatus('❌ Ошибка подключения', true);
+                updateStatus('❌ Connection error', true);
             };
 
             ws.onmessage = function(event) {
@@ -220,12 +220,12 @@
             const div = document.createElement('div');
             div.className = 'message bot';
             
-            // Текстовый ответ
+            // Text response
             const replyDiv = document.createElement('div');
             replyDiv.textContent = response.reply;
             div.appendChild(replyDiv);
             
-            // Чипсы (быстрые действия)
+            // Chips (quick actions)
             if (response.chips && response.chips.length > 0) {
                 const chipsDiv = document.createElement('div');
                 chipsDiv.className = 'chips';
@@ -246,29 +246,29 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
-        // Отправка по Enter
+        // Send on Enter
         messageInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 sendMessage();
             }
         });
 
-        // Смена режима
+        // Mode change
         modeSelect.addEventListener('change', connectWebSocket);
 
-        // Приветственное сообщение
+        // Welcome message
         setTimeout(() => {
             displayBotMessage({
-                reply: "Привет! Я BookBot с новым orchestrator. Выберите режим и попробуйте разные типы сообщений! 🧪",
+                reply: "Hello! I'm BookBot with a new orchestrator. Choose a mode and try different types of messages! 🧪",
                 chips: [
-                    {"text": "Привет!"},
-                    {"text": "Найди книги по психологии"},
-                    {"text": "Расскажи о погоде"}
+                    {"text": "Hello!"},
+                    {"text": "Find books on psychology"},
+                    {"text": "Tell me about weather"}
                 ]
             });
         }, 1000);
 
-        // Подключаемся при загрузке
+        // Connect on load
         connectWebSocket();
     </script>
 </body>

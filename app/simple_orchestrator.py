@@ -348,17 +348,17 @@ async def process_simple_search(session_id: str, message: str) -> Dict[str, Any]
             analysis = final_state.analysis
             uncertainty_note = getattr(final_state, 'uncertainty_note', '')
         else:
-            # Если final_state это dict
+            # If final_state is a dict
             performance_metrics = final_state.get('performance_metrics', {})
             performance_metrics['total_time'] = total_time
             search_results = final_state.get('search_results', [])
             filtered_results = final_state.get('filtered_results', [])
-            final_response = final_state.get('final_response', 'Ошибка обработки')
+            final_response = final_state.get('final_response', 'Processing error')
             intent = final_state.get('intent', 'error')
-            analysis = final_state.get('analysis', 'Анализ недоступен')
+            analysis = final_state.get('analysis', 'Analysis unavailable')
             uncertainty_note = final_state.get('uncertainty_note', '')
         
-        # Формируем результат
+        # Form the result
         result = {
             "response": final_response,
             "results": [
@@ -381,19 +381,19 @@ async def process_simple_search(session_id: str, message: str) -> Dict[str, Any]
             }
         }
         
-        logger.info(f"🎯 [Simple Search] Завершено за {total_time:.2f}с: "
-                   f"найдено {len(search_results)}, отфильтровано {len(filtered_results)}")
+        logger.info(f"🎯 [Simple Search] Completed in {total_time:.2f}s: "
+                   f"found {len(search_results)}, filtered {len(filtered_results)}")
         
         return result
         
     except Exception as e:
-        logger.error(f"❌ [Simple Search] Критическая ошибка: {e}")
+        logger.error(f"❌ [Simple Search] Critical error: {e}")
         
         return {
-            "response": f"Извините, произошла ошибка при обработке запроса: {e}",
+            "response": f"Sorry, an error occurred while processing the request: {e}",
             "results": [],
             "intent": "error",
-            "analysis": f"Критическая ошибка: {e}",
+            "analysis": f"Critical error: {e}",
             "performance_metrics": {"total_time": time.time() - total_start_time},
             "search_stats": {
                 "total_found": 0,

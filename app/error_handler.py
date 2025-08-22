@@ -56,17 +56,17 @@ class BookBotError(Exception):
     def _default_user_message(self) -> str:
         """Generate user-friendly error message"""
         user_messages = {
-            ErrorType.VALIDATION_ERROR: "Пожалуйста, проверьте введенные данные",
-            ErrorType.SECURITY_ERROR: "Обнаружена потенциально небезопасная активность", 
-            ErrorType.LLM_ERROR: "Сервис анализа временно недоступен",
-            ErrorType.SEARCH_ERROR: "Поиск временно недоступен",
-            ErrorType.DATABASE_ERROR: "База данных временно недоступна",
-            ErrorType.TIMEOUT_ERROR: "Запрос выполняется слишком долго",
-            ErrorType.RATE_LIMIT_ERROR: "Превышен лимит запросов",
-            ErrorType.FILE_ERROR: "Ошибка обработки файла",
-            ErrorType.UNKNOWN_ERROR: "Произошла неожиданная ошибка"
+            ErrorType.VALIDATION_ERROR: "Please check the entered data",
+            ErrorType.SECURITY_ERROR: "Potentially unsafe activity detected", 
+            ErrorType.LLM_ERROR: "Analysis service temporarily unavailable",
+            ErrorType.SEARCH_ERROR: "Search temporarily unavailable",
+            ErrorType.DATABASE_ERROR: "Database temporarily unavailable",
+            ErrorType.TIMEOUT_ERROR: "Request is taking too long",
+            ErrorType.RATE_LIMIT_ERROR: "Request limit exceeded",
+            ErrorType.FILE_ERROR: "File processing error",
+            ErrorType.UNKNOWN_ERROR: "An unexpected error occurred"
         }
-        return user_messages.get(self.error_type, "Произошла ошибка")
+        return user_messages.get(self.error_type, "An error occurred")
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert error to dictionary for logging"""
@@ -309,7 +309,7 @@ class CircuitBreaker:
                         message="Service temporarily unavailable (Circuit Breaker Open)",
                         error_type=ErrorType.TIMEOUT_ERROR,
                         severity=ErrorSeverity.HIGH,
-                        user_message="Сервис временно недоступен"
+                        user_message="Service temporarily unavailable"
                     )
             
             try:
@@ -330,7 +330,7 @@ class CircuitBreaker:
                         message="Service temporarily unavailable (Circuit Breaker Open)",
                         error_type=ErrorType.TIMEOUT_ERROR,
                         severity=ErrorSeverity.HIGH,
-                        user_message="Сервис временно недоступен"
+                        user_message="Service temporarily unavailable"
                     )
             
             try:
@@ -434,7 +434,7 @@ class ValidationError(BookBotError):
             error_type=ErrorType.VALIDATION_ERROR,
             severity=ErrorSeverity.LOW,
             details=details,
-            user_message="Пожалуйста, проверьте введенные данные"
+            user_message="Please check the entered data"
         )
 
 class SecurityError(BookBotError):
@@ -444,7 +444,7 @@ class SecurityError(BookBotError):
             error_type=ErrorType.SECURITY_ERROR,
             severity=ErrorSeverity.HIGH,
             details=details,
-            user_message="Обнаружена подозрительная активность"
+            user_message="Suspicious activity detected"
         )
 
 class LLMError(BookBotError):
@@ -454,7 +454,7 @@ class LLMError(BookBotError):
             error_type=ErrorType.LLM_ERROR,
             severity=ErrorSeverity.MEDIUM,
             details=details,
-            user_message="Сервис анализа временно недоступен"
+            user_message="Analysis service temporarily unavailable"
         )
 
 class SearchError(BookBotError):
@@ -464,7 +464,7 @@ class SearchError(BookBotError):
             error_type=ErrorType.SEARCH_ERROR,
             severity=ErrorSeverity.MEDIUM,
             details=details,
-            user_message="Поиск временно недоступен"
+            user_message="Search temporarily unavailable"
         )
 
 class TimeoutError(BookBotError):
@@ -474,7 +474,7 @@ class TimeoutError(BookBotError):
             error_type=ErrorType.TIMEOUT_ERROR,
             severity=ErrorSeverity.MEDIUM,
             details=details,
-            user_message="Запрос выполняется слишком долго, попробуйте позже"
+            user_message="Request is taking too long, please try again later"
         )
 
 # Utility functions

@@ -77,9 +77,9 @@ def _is_agreement_message(message: str) -> bool:
     """Checks if message is an agreement"""
     import re
     agreement_patterns = [
-        r'^да$', r'^давай$', r'^хорошо$', r'^ок$', r'^okay$', r'^конечно$',
-        r'^согласен$', r'^согласна$', r'^подходит$', r'^отлично$', r'^супер$',
-        r'^можно$', r'^пойдет$', r'^идет$', r'^принято$', r'^звучит\s+хорошо$'
+        r'^да$', r'^давай$', r'^хорошо$', r'^ок$', r'^okay$', r'^конечно$',  # Russian: да=yes, давай=let's go, хорошо=good, ок=ok, конечно=of course
+        r'^согласен$', r'^согласна$', r'^подходит$', r'^отлично$', r'^супер$',  # Russian: согласен/согласна=agree, подходит=suitable, отлично=excellent, супер=super
+        r'^можно$', r'^пойдет$', r'^идет$', r'^принято$', r'^звучит\s+хорошо$'  # Russian: можно=possible, пойдет=will do, идет=goes, принято=accepted, звучит хорошо=sounds good
     ]
     
     message_lower = message.lower().strip()
@@ -108,7 +108,7 @@ def _docs_to_payload(docs):
     return out
 
 def node_detect_intent(state: ChatStateWithChat) -> ChatStateWithChat:
-    """Определяет интент сообщения"""
+    """Determines message intent"""
     logger.info("�� [orchestrator_with_chat.py] node_detect_intent - Analyzing user intent...")
     logger.info(f"    Input: '{state.message}'")
     
@@ -137,52 +137,52 @@ def node_detect_intent(state: ChatStateWithChat) -> ChatStateWithChat:
     - chat: General conversation NOT about books (weather, how are you, etc)
 
     CONTEXT ANALYSIS RULES:
-    1. If user agrees with vague words (да, давай, хорошо, ок, конечно) to assistant's suggestion:
-       - IF assistant mentioned MULTIPLE options (e.g., "фэнтези или детективы"): 
+    1. If user agrees with vague words (да, давай, хорошо, ок, конечно) to assistant's suggestion:  # Russian: да=yes, давай=let's go, хорошо=good, ок=ok, конечно=of course
+       - IF assistant mentioned MULTIPLE options (e.g., "fantasy or detective"):  # Russian example: фэнтези или детективы 
          → USE "clarify" intent to let user choose specific option
        - IF assistant mentioned ONE specific option: 
          → Extract that specific option and create appropriate intent
        
     2. Examples:
-       History: "assistant: Как насчет книг в жанре фэнтези или детективов?"
-       User: "давай"
-       → {"intent": "clarify", "filters": {"options": ["фэнтези", "детективы"], "type": "genre"}}
+       History: "assistant: How about books in fantasy or detective genre?"  # Russian example: Как насчет книг в жанре фэнтези или детективов?
+       User: "let's go"  # Russian example: давай
+       → {"intent": "clarify", "filters": {"options": ["fantasy", "detective"], "type": "genre"}}  # Russian terms: фэнтези, детективы
        
-       History: "assistant: Может быть фантастика?"
-       User: "давай"  
-       → {"intent": "genre", "filters": {"genre": "фантастика"}}
+       History: "assistant: Maybe science fiction?"  # Russian example: Может быть фантастика?
+       User: "let's go"  # Russian example: давай
+       → {"intent": "genre", "filters": {"genre": "science fiction"}}  # Russian term: фантастика
        
-       History: "assistant: Попробуй Стивена Кинга"
-       User: "хорошо" 
-       → {"intent": "author", "filters": {"author": "Стивен Кинг"}}
+       History: "assistant: Try Stephen King"  # Russian example: Попробуй Стивена Кинга
+       User: "good"  # Russian example: хорошо
+       → {"intent": "author", "filters": {"author": "Stephen King"}}  # Russian term: Стивен Кинг
        
-       History: "assistant: Может книги по психологии?"
-       User: "да"
-       → {"intent": "topic", "filters": {"topic": "психология"}}
+       History: "assistant: Maybe books about psychology?"  # Russian example: Может книги по психологии?
+       User: "yes"  # Russian example: да
+       → {"intent": "topic", "filters": {"topic": "psychology"}}  # Russian term: психология
 
     3. ADVICE/RECOMMENDATION REQUESTS are CLARIFY:
-       User: "посоветуй жанр" / "посоветуй что почитать" / "что мне почитать?"
+       User: "recommend a genre" / "recommend what to read" / "what should I read?"  # Russian examples: посоветуй жанр / посоветуй что почитать / что мне почитать?
        → {"intent": "clarify", "filters": {"request_type": "genre_advice"}}
        
-       User: "посоветуй автора" / "какого автора почитать?"
+       User: "recommend an author" / "which author to read?"  # Russian examples: посоветуй автора / какого автора почитать?
        → {"intent": "clarify", "filters": {"request_type": "author_advice"}}
        
-       User: "не знаю что выбрать" / "помоги выбрать"
+       User: "don't know what to choose" / "help me choose"  # Russian examples: не знаю что выбрать / помоги выбрать
        → {"intent": "clarify", "filters": {"request_type": "general_advice"}}
 
     4. IMPORTANT: For non-specific agreements:
-       - If user says just "давай" without clear context from assistant's last message
+       - If user says just "let's go" without clear context from assistant's last message  # Russian example: давай
        - If assistant didn't make specific suggestions in last message
        → USE "chat" intent to continue conversation
        
        BUT: If assistant was asking about books/genres (context shows book discussion):
-       User: "окей давай" / "давай" 
+       User: "okay let's go" / "let's go"  # Russian examples: окей давай / давай 
        → {"intent": "clarify", "filters": {"request_type": "genre_advice"}}
 
     5. Look for specific mentions in assistant's previous messages:
-       - Author names (Стивен Кинг, Агата Кристи, George Orwell, etc.)
-       - Genres (фантастика, детектив, психология, бизнес, фэнтези, etc.) 
-       - Topics (искусство, наука, история, etc.)
+       - Author names (Стивен Кинг, Агата Кристи, George Orwell, etc.)  # Russian: Стивен Кинг=Stephen King, Агата Кристи=Agatha Christie
+       - Genres (фантастика, детектив, психология, бизнес, фэнтези, etc.)  # Russian: фантастика=sci-fi, детектив=detective, психология=psychology, бизнес=business, фэнтези=fantasy
+       - Topics (искусство, наука, история, etc.)  # Russian: искусство=art, наука=science, история=history
        - Book titles
 
     Return JSON: {"intent":"...", "filters":{...}}
@@ -219,59 +219,59 @@ def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
     logger.info("�� [orchestrator_with_chat.py] node_chat - Processing chat message...")
     
     try:
-        # Специальная обработка clarify intent
+        # Special handling for clarify intent
         if state.intent == "clarify":
             logger.info("🔍 Clarify intent detected - helping with book choice")
             
-            # Обработка выбора между опциями (множественные варианты)
+            # Handle choice between options (multiple variants)
             if state.filters.get("options"):
                 options = state.filters.get("options", [])
                 if len(options) == 2:
-                    reply = f"Отлично! Что именно тебя больше интересует: {options[0]} или {options[1]}?"
+                    reply = f"Excellent! What interests you more: {options[0]} or {options[1]}?"  # Translated from Russian: Отлично! Что именно тебя больше интересует...
                     chips = [
                         {"text": options[0].capitalize(), "action": "search"},
                         {"text": options[1].capitalize(), "action": "search"}
                     ]
                 else:
                     option_list = ", ".join(options)
-                    reply = f"Хорошо! Выбери что именно: {option_list}"
+                    reply = f"Good! Choose exactly what: {option_list}"  # Translated from Russian: Хорошо! Выбери что именно...
                     chips = [{"text": opt.capitalize(), "action": "search"} for opt in options]
             
-            # Обработка запросов на советы
+            # Handle advice requests
             elif state.filters.get("request_type"):
                 request_type = state.filters["request_type"]
                 
                 if request_type == "genre_advice":
-                    reply = "С удовольствием помогу выбрать жанр! Что тебе больше по душе?"
+                    reply = "С удовольствием помогу выбрать жанр! Что тебе больше по душе?"  # Russian: I'll gladly help choose a genre! What do you prefer?
                     chips = [
-                        {"text": "Детектив", "action": "search"},
-                        {"text": "Фэнтези", "action": "search"}, 
-                        {"text": "Классика", "action": "search"},
-                        {"text": "Романы", "action": "search"}
+                        {"text": "Детектив", "action": "search"},  # Russian: Детектив=Detective
+                        {"text": "Фэнтези", "action": "search"},  # Russian: Фэнтези=Fantasy
+                        {"text": "Классика", "action": "search"},  # Russian: Классика=Classics
+                        {"text": "Романы", "action": "search"}  # Russian: Романы=Novels
                     ]
                 elif request_type == "author_advice":
-                    reply = "Отлично! Какого типа авторов предпочитаешь?"
+                    reply = "Отлично! Какого типа авторов предпочитаешь?"  # Russian: Excellent! What type of authors do you prefer?
                     chips = [
-                        {"text": "Современные авторы", "action": "search"},
-                        {"text": "Классики", "action": "search"},
-                        {"text": "Зарубежные авторы", "action": "search"},
-                        {"text": "Русские авторы", "action": "search"}
+                        {"text": "Современные авторы", "action": "search"},  # Russian: Современные авторы=Contemporary authors
+                        {"text": "Классики", "action": "search"},  # Russian: Классики=Classics
+                        {"text": "Зарубежные авторы", "action": "search"},  # Russian: Зарубежные авторы=Foreign authors
+                        {"text": "Русские авторы", "action": "search"}  # Russian: Русские авторы=Russian authors
                     ]
                 else:  # general_advice
-                    reply = "Давай подберем что-то интересное! С чего начнем?"
+                    reply = "Давай подберем что-то интересное! С чего начнем?"  # Russian: Let's find something interesting! Where shall we start?
                     chips = [
-                        {"text": "Детектив", "action": "search"},
-                        {"text": "Фэнтези", "action": "search"},
-                        {"text": "Психология", "action": "search"},
-                        {"text": "История", "action": "search"}
+                        {"text": "Детектив", "action": "search"},  # Russian: Детектив=Detective
+                        {"text": "Фэнтези", "action": "search"},  # Russian: Фэнтези=Fantasy
+                        {"text": "Психология", "action": "search"},  # Russian: Психология=Psychology
+                        {"text": "История", "action": "search"}  # Russian: История=History
                     ]
             
-            # Fallback для других clarify случаев
+            # Fallback for other clarify cases
             else:
-                reply = "Чем могу помочь с выбором книг?"
+                reply = "Чем могу помочь с выбором книг?"  # Russian: How can I help with choosing books?
                 chips = [
-                    {"text": "Посоветуй жанр", "action": "chat"},
-                    {"text": "Найти по теме", "action": "search"}
+                    {"text": "Посоветуй жанр", "action": "chat"},  # Russian: Посоветуй жанр=Recommend a genre
+                    {"text": "Найти по теме", "action": "search"}  # Russian: Найти по теме=Find by topic
                 ]
                 
             state.reply_message = reply
@@ -279,35 +279,35 @@ def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
             state.is_chat_mode = True
             return state
         
-        # Форматируем историю
+        # Format history
         history_text = _format_chat_history(state.chat_history)
         
-        # Проверяем длину разговора - если больше 4 сообщений, становимся настойчивее
+        # Check conversation length - if more than 4 messages, become more insistent
         chat_length = len(state.chat_history or [])
         if chat_length >= 4:
             logger.info("📢 Long chat detected - being more insistent about books")
             
-            # Проверяем - может пользователь согласился на предложение о книгах?
+            # Check - maybe user agreed to the book suggestion?
             is_agreement = _is_agreement_message(state.message)
             if is_agreement:
                 logger.info("🤝 User agreed after insistence - switching to clarify for advice")
-                # Переключаемся на clarify для выбора жанра
+                # Switch to clarify for genre selection
                 state.intent = "clarify"
                 state.filters = {"request_type": "genre_advice"}
-                # Возвращаемся к обработке clarify выше
+                # Return to clarify processing above
                 return node_chat(state)
             
-            # Если не согласие - продолжаем настаивать, но менее навязчиво
+            # If not agreement - continue insisting, but less intrusively
             result = {
-                "reply": "Я BookBot - помощник по книгам. Может, все-таки посмотрим что-то интересное?",
+                "reply": "Я BookBot - помощник по книгам. Может, все-таки посмотрим что-то интересное?",  # Russian: I'm BookBot - a book assistant. Maybe let's look at something interesting after all?
                 "chips": [
-                    {"text": "Посоветуй жанр", "action": "chat"},
-                    {"text": "Найти детектив", "action": "search"},
-                    {"text": "Найти фэнтези", "action": "search"}
+                    {"text": "Посоветуй жанр", "action": "chat"},  # Russian: Посоветуй жанр=Recommend a genre
+                    {"text": "Найти детектив", "action": "search"},  # Russian: Найти детектив=Find detective
+                    {"text": "Найти фэнтези", "action": "search"}  # Russian: Найти фэнтези=Find fantasy
                 ]
             }
         else:
-            # Анализируем сообщение через LLM
+            # Analyze message through LLM
             chat_prompt = ChatPromptTemplate.from_template(CHAT_SYS)
             chain = chat_prompt | chat_llm | JsonOutputParser()
             
@@ -316,8 +316,8 @@ def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
                 "chat_history": history_text
             })
         
-        # Создаем ответ
-        reply = result.get("reply", "Извините, не понял.")
+        # Create response
+        reply = result.get("reply", "Извините, не понял.")  # Russian: Sorry, didn't understand.
         chips = result.get("chips", [])
         
         state.reply_message = reply
@@ -328,13 +328,13 @@ def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
         
     except Exception as e:
         logger.error(f"❌ Chat processing failed: {e}")
-        state.reply_message = "Извините, что-то пошло не так. Могу помочь найти интересные книги!"
-        state.chips = [{"text": "Найти книги", "action": "search"}]
+        state.reply_message = "Извините, что-то пошло не так. Могу помочь найти интересные книги!"  # Russian: Sorry, something went wrong. I can help find interesting books!
+        state.chips = [{"text": "Найти книги", "action": "search"}]  # Russian: Найти книги=Find books
         state.is_chat_mode = True
         return state
 
 def node_route_search(state: ChatStateWithChat) -> ChatStateWithChat:
-    """Поиск книг (копируем логику из оригинального)"""
+    """Book search (copying logic from original)"""
     logger.info("�� [orchestrator_with_chat.py] node_route_search - Searching for relevant documents...")
     logger.info(f"    Intent: '{state.intent}'")
     
@@ -386,18 +386,18 @@ def node_route_search(state: ChatStateWithChat) -> ChatStateWithChat:
     return state
 
 def node_answer(state: ChatStateWithChat) -> ChatStateWithChat:
-    """Формирует финальный ответ"""
+    """Forms final answer"""
     logger.info("�� [orchestrator_with_chat.py] node_answer - Generating final response...")
     
     if state.is_chat_mode:
-        # Если это чат, используем готовый ответ
+        # If this is chat, use ready response
         logger.info("💬 Using chat response")
         
-        # Обновляем историю чата
+        # Update chat history
         if state.chat_history is None:
             state.chat_history = []
         
-        # Добавляем ответ бота в историю
+        # Add bot response to history
         state.chat_history.append({
             "role": "assistant", 
             "content": state.reply_message
@@ -410,31 +410,31 @@ def node_answer(state: ChatStateWithChat) -> ChatStateWithChat:
         }]
         return state
     
-    # Если это поиск, форматируем результаты
+    # If this is search, format results
     logger.info(f"    Formatting {len(state.results)} search results")
     
     if not state.results:
         logger.info("🚫 No results found")
-        no_results_msg = f"К сожалению, не найдено книг, соответствующих вашему запросу '{state.message}'. Попробуйте изменить запрос или загрузить больше книг."
+        no_results_msg = f"К сожалению, не найдено книг, соответствующих вашему запросу '{state.message}'. Попробуйте изменить запрос или загрузить больше книг."  # Russian: Unfortunately, no books found matching your query '{state.message}'. Try changing the query or uploading more books.
         state.results = [{"message": no_results_msg, "intent": state.intent}]
         return state
     
-    # Форматируем результаты поиска
+    # Format search results
     if state.results:
         formatted_results = []
-        for i, result in enumerate(state.results[:5]):  # Топ-5 результатов
+        for i, result in enumerate(state.results[:5]):  # Top-5 results
             title = result.get('title', 'Unknown')
             author = result.get('author', 'Unknown')
             genre = result.get('primary_genre', 'Unknown')
-            formatted_results.append(f"{i+1}. «{title}» от {author} ({genre})")
+            formatted_results.append(f"{i+1}. «{title}» от {author} ({genre})")  # Russian: от=by
         
-        reply = f"Нашёл {len(state.results)} книг по вашему запросу:\n\n" + "\n".join(formatted_results)
+        reply = f"Нашёл {len(state.results)} книг по вашему запросу:\n\n" + "\n".join(formatted_results)  # Russian: Found {count} books for your query:
         
-        # Добавляем чипсы для поиска
+        # Add chips for search
         chips = [
-            {"text": "Ещё похожие", "action": "search"},
-            {"text": "Другой жанр", "action": "search"},
-            {"text": "Поговорим о другом", "action": "chat"}
+            {"text": "Ещё похожие", "action": "search"},  # Russian: Ещё похожие=More similar
+            {"text": "Другой жанр", "action": "search"},  # Russian: Другой жанр=Another genre
+            {"text": "Поговорим о другом", "action": "chat"}  # Russian: Поговорим о другом=Let's talk about something else
         ]
         
         state.results = [{
@@ -443,7 +443,7 @@ def node_answer(state: ChatStateWithChat) -> ChatStateWithChat:
             "chips": chips
         }]
         
-        # Обновляем историю чата для поиска
+        # Update chat history for search
         if state.chat_history is None:
             state.chat_history = []
         
@@ -455,22 +455,22 @@ def node_answer(state: ChatStateWithChat) -> ChatStateWithChat:
     return state
 
 def should_route_to_chat(state: ChatStateWithChat) -> str:
-    """Определяет, нужно ли обрабатывать как чат или поиск"""
+    """Determines whether to process as chat or search"""
     
-    # Если уже определен интент для поиска - используем его
+    # If search intent is already determined - use it
     search_intents = ["isbn", "author", "title", "author_title", "genre", "topic"]
     if state.intent in search_intents:
         return "route_search"
     
-    # Если интент указывает на чат - используем его
+    # If intent indicates chat - use it
     chat_intents = ["clarify", "greeting", "farewell", "chat"]
     if state.intent in chat_intents:
         return "chat"
     
-    # Если интент не определен или неясен - по умолчанию чат
+    # If intent is not determined or unclear - default to chat
     return "chat"
 
-# Создаем граф
+# Create graph
 builder = StateGraph(ChatStateWithChat)
 builder.add_node("detect_intent", node_detect_intent)
 builder.add_node("chat", node_chat)
@@ -479,7 +479,7 @@ builder.add_node("answer", node_answer)
 
 builder.set_entry_point("detect_intent")
 
-# Условные переходы
+# Conditional transitions
 builder.add_conditional_edges(
     "detect_intent",
     should_route_to_chat,

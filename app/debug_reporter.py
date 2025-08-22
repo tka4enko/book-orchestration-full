@@ -262,43 +262,43 @@ IMPORTANT: Always respond in Russian language."""
             
         except Exception as e:
             logger.warning(f"LLM analysis failed: {e}")
-            self.current_session.llm_analysis = "❌ Анализ не удался"
+            self.current_session.llm_analysis = "❌ Analysis failed"
             
     def _print_compact_report(self) -> None:
-        """Печать расширенного отчета отладки в терминал"""
+        """Print extended debug report to terminal"""
         if not self.current_session:
             return
             
         session = self.current_session
         
-        # Статус выполнения
-        status = "✅ УСПЕШНО" if session.success else "❌ ОШИБКА"
+        # Execution status
+        status = "✅ SUCCESS" if session.success else "❌ ERROR"
         
         print(f"\n{'='*100}")
-        print(f"🔍 ОТЧЕТ ОТЛАДКИ | {status} | {session.execution_time_ms:.0f}ms")
+        print(f"🔍 DEBUG REPORT | {status} | {session.execution_time_ms:.0f}ms")
         print(f"{'='*100}")
         
-        # Запрос пользователя
-        print(f"📝 Запрос пользователя: '{session.original_query}'")
+        # User query
+        print(f"📝 User query: '{session.original_query}'")
         
-        # ============= АНАЛИЗ НАМЕРЕНИЯ =============
-        print(f"\n🧠 АНАЛИЗ НАМЕРЕНИЯ:")
-        print(f"   💡 Определенное намерение: {session.intent} ({session.intent_confidence} уверенность)")
-        print(f"   🔧 Метод определения: {session.intent_method or 'не указан'}")
+        # ============= INTENT ANALYSIS =============
+        print(f"\n🧠 INTENT ANALYSIS:")
+        print(f"   💡 Detected intent: {session.intent} ({session.intent_confidence} confidence)")
+        print(f"   🔧 Detection method: {session.intent_method or 'not specified'}")
         
         if session.intent_details:
-            print(f"   📋 Детали анализа:")
+            print(f"   📋 Analysis details:")
             for key, value in session.intent_details.items():
                 print(f"      • {key}: {value}")
         
-        # Флаги обработки запроса
-        print(f"   🔍 Простой запрос: {'Да' if session.simple_query_check else 'Нет'}")
-        print(f"   ⚙️  Mixed filters: {'Использовались' if session.mixed_filters_used else 'Не использовались'}")
-        print(f"   🎯 Predicate filter: {'Применялся' if session.predicate_filter_used else 'Не применялся'}")
+        # Query processing flags
+        print(f"   🔍 Simple query: {'Yes' if session.simple_query_check else 'No'}")
+        print(f"   ⚙️  Mixed filters: {'Used' if session.mixed_filters_used else 'Not used'}")
+        print(f"   🎯 Predicate filter: {'Applied' if session.predicate_filter_used else 'Not applied'}")
         
-        # Извлеченные фильтры
+        # Extracted filters
         if session.filters:
-            print(f"\n🎯 ИЗВЛЕЧЕННЫЕ ФИЛЬТРЫ:")
+            print(f"\n🎯 EXTRACTED FILTERS:")
             for key, value in session.filters.items():
                 if value and value != [] and value != {}:
                     if isinstance(value, list):
@@ -306,113 +306,113 @@ IMPORTANT: Always respond in Russian language."""
                     else:
                         print(f"   • {key}: {value}")
         
-        # ============= ПОИСКОВЫЕ ЗАПРОСЫ =============
-        print(f"\n🔎 ПОИСКОВЫЕ ЗАПРОСЫ:")
+        # ============= SEARCH QUERIES =============
+        print(f"\n🔎 SEARCH QUERIES:")
         if session.bm25_query:
-            print(f"   📊 BM25 запрос: '{session.bm25_query}'")
+            print(f"   📊 BM25 query: '{session.bm25_query}'")
         if session.vector_query:
-            print(f"   🧮 Vector запрос: '{session.vector_query}'")
+            print(f"   🧮 Vector query: '{session.vector_query}'")
         if not session.bm25_query and not session.vector_query:
-            print(f"   ❓ Поисковые запросы не записаны")
+            print(f"   ❓ Search queries not recorded")
         
-        # ============= ПОИСКОВЫЙ КОНВЕЙЕР =============
-        print(f"\n🔎 ПОИСКОВЫЙ КОНВЕЙЕР:")
+        # ============= SEARCH PIPELINE =============
+        print(f"\n🔎 SEARCH PIPELINE:")
         if not session.steps:
-            print(f"   ❓ Шаги поиска не записаны")
+            print(f"   ❓ Search steps not recorded")
         else:
             for i, step in enumerate(session.steps, 1):
                 icon = "✅" if step.success else "❌"
-                results_info = f"({step.results_count} результатов)" if step.success else f"({step.reason})"
+                results_info = f"({step.results_count} results)" if step.success else f"({step.reason})"
                 query_display = step.query[:50] + "..." if len(step.query) > 50 else step.query
                 print(f"  {i}. {icon} {step.name}: {results_info}")
-                print(f"     🔍 Запрос: '{query_display}'")
+                print(f"     🔍 Query: '{query_display}'")
                 
-                # Детальная информация если есть
+                # Detailed information if available
                 if step.details:
                     for key, value in step.details.items():
                         if key == 'similarity_score':
-                            print(f"     📈 Схожесть: {value}")
+                            print(f"     📈 Similarity: {value}")
                         elif key == 'threshold':
-                            print(f"     🎯 Порог: {value}")
+                            print(f"     🎯 Threshold: {value}")
                         elif key == 'boost_score':
-                            print(f"     ⚡ Буст: {value}")
+                            print(f"     ⚡ Boost: {value}")
                         elif key == 'search_type':
-                            print(f"     🔧 Тип поиска: {value}")
+                            print(f"     🔧 Search type: {value}")
                         elif key == 'intent':
-                            print(f"     🧠 Намерение: {value}")
+                            print(f"     🧠 Intent: {value}")
                         else:
                             print(f"     📋 {key}: {value}")
         
-        # ============= ФИЛЬТРАЦИЯ РЕЗУЛЬТАТОВ =============
+        # ============= RESULTS FILTERING =============
         if session.filtered_results:
-            print(f"\n🎛️  ФИЛЬТРАЦИЯ РЕЗУЛЬТАТОВ:")
+            print(f"\n🎛️  RESULTS FILTERING:")
             for i, result in enumerate(session.filtered_results, 1):
-                action = result.get('action', 'неизвестно')
-                reason = result.get('reason', 'причина не указана')
+                action = result.get('action', 'unknown')
+                reason = result.get('reason', 'reason not specified')
                 book_info = result.get('book_info', {})
-                title = book_info.get('title', 'Без названия')
-                author = book_info.get('author', 'Неизвестный автор')
+                title = book_info.get('title', 'Untitled')
+                author = book_info.get('author', 'Unknown author')
                 score = result.get('score', 'N/A')
-                print(f"  {i}. {action}: '{title}' by {author} (оценка: {score})")
-                print(f"     🔍 Причина: {reason}")
+                print(f"  {i}. {action}: '{title}' by {author} (score: {score})")
+                print(f"     🔍 Reason: {reason}")
         
-        # ============= МЕТРИКИ ПРОИЗВОДИТЕЛЬНОСТИ =============
-        print(f"\n⏱️  МЕТРИКИ ПРОИЗВОДИТЕЛЬНОСТИ:")
-        print(f"   🕐 Общее время выполнения: {session.execution_time_ms:.1f}ms")
+        # ============= PERFORMANCE METRICS =============
+        print(f"\n⏱️  PERFORMANCE METRICS:")
+        print(f"   🕐 Total execution time: {session.execution_time_ms:.1f}ms")
         
-        # Детальные метрики поиска (если доступны)
+        # Detailed search metrics (if available)
         if session.search_metrics:
-            print(f"   📊 Детальные метрики поиска:")
+            print(f"   📊 Detailed search metrics:")
             for metric_name, value in session.search_metrics.items():
                 if metric_name == "bm25_search_ms":
-                    print(f"      🔤 BM25 поиск: {value:.1f}ms")
+                    print(f"      🔤 BM25 search: {value:.1f}ms")
                 elif metric_name == "vector_books_search_ms":
-                    print(f"      📚 Vector books поиск: {value:.1f}ms")
+                    print(f"      📚 Vector books search: {value:.1f}ms")
                 elif metric_name == "vector_content_search_ms":
-                    print(f"      📄 Vector content поиск: {value:.1f}ms")
+                    print(f"      📄 Vector content search: {value:.1f}ms")
                 elif metric_name == "results_filtering_ms":
-                    print(f"      🎛️  Фильтрация результатов: {value:.1f}ms")
+                    print(f"      🎛️  Filtering results: {value:.1f}ms")
                 elif metric_name == "initialization_ms":
-                    print(f"      ⚙️  Инициализация: {value:.1f}ms")
+                    print(f"      ⚙️  Initialization: {value:.1f}ms")
                 elif metric_name == "total_search_time_ms":
-                    print(f"      🔍 Общее время поиска: {value:.1f}ms")
+                    print(f"      🔍 Total search time: {value:.1f}ms")
                 else:
                     print(f"      📊 {metric_name}: {value:.1f}ms")
         
-        # Метрики производительности этапов (если доступны)
+        # Stage performance metrics (if available)
         if session.performance_metrics:
-            print(f"   📈 Метрики производительности этапов:")
+            print(f"   📈 Stage performance metrics:")
             for metric_name, value in session.performance_metrics.items():
                 if metric_name == "detect_intent_ms":
-                    print(f"      🧠 Определение намерения: {value:.1f}ms")
+                    print(f"      🧠 Intent detection: {value:.1f}ms")
                 elif metric_name == "route_search_ms":
-                    print(f"      🔍 Маршрутизация поиска: {value:.1f}ms")
+                    print(f"      🔍 Search routing: {value:.1f}ms")
                 elif metric_name == "core_search_ms":
-                    print(f"      🔍 Основной поиск: {value:.1f}ms")
+                    print(f"      🔍 Core search: {value:.1f}ms")
                 elif metric_name == "post_search_processing_ms":
-                    print(f"      ⚙️  Пост-обработка: {value:.1f}ms")
+                    print(f"      ⚙️  Post-processing: {value:.1f}ms")
                 elif metric_name == "answer_generation_ms":
-                    print(f"      💬 Генерация ответа: {value:.1f}ms")
+                    print(f"      💬 Answer generation: {value:.1f}ms")
                 else:
                     print(f"      📊 {metric_name}: {value:.1f}ms")
             
-            # Добавляем детальную разбивку времени
-            print(f"\n   🔍 ДЕТАЛЬНАЯ РАЗБИВКА ВРЕМЕНИ:")
+            # Add detailed time breakdown
+            print(f"\n   🔍 DETAILED TIME BREAKDOWN:")
             
-            # Определение намерения
+            # Intent detection
             detect_intent_time = session.performance_metrics.get("detect_intent_ms", 0)
             if detect_intent_time > 0:
-                print(f"      🧠 Определение намерения: {detect_intent_time:.1f}ms")
+                print(f"      🧠 Intent detection: {detect_intent_time:.1f}ms")
             
-            # Маршрутизация поиска
+            # Search routing
             route_search_time = session.performance_metrics.get("route_search_ms", 0)
             core_search_time = session.performance_metrics.get("core_search_ms", 0)
             post_processing_time = session.performance_metrics.get("post_search_processing_ms", 0)
             
             if route_search_time > 0:
-                print(f"      🔍 Маршрутизация поиска (общее): {route_search_time:.1f}ms")
+                print(f"      🔍 Search routing (total): {route_search_time:.1f}ms")
                 if core_search_time > 0:
-                    print(f"         ├─ Основной поиск: {core_search_time:.1f}ms")
+                    print(f"         ├─ Core search: {core_search_time:.1f}ms")
                     if session.search_metrics:
                         bm25_time = session.search_metrics.get("bm25_search_ms", 0)
                         vector_books_time = session.search_metrics.get("vector_books_search_ms", 0)
@@ -421,52 +421,52 @@ IMPORTANT: Always respond in Russian language."""
                         init_time = session.search_metrics.get("initialization_ms", 0)
                         
                         if init_time > 0:
-                            print(f"         │  ├─ Инициализация: {init_time:.1f}ms")
+                            print(f"         │  ├─ Initialization: {init_time:.1f}ms")
                         if bm25_time > 0:
-                            print(f"         │  ├─ BM25 поиск: {bm25_time:.1f}ms")
+                            print(f"         │  ├─ BM25 search: {bm25_time:.1f}ms")
                         if vector_books_time > 0:
                             print(f"         │  ├─ Vector books: {vector_books_time:.1f}ms")
                         if vector_content_time > 0:
                             print(f"         │  ├─ Vector content: {vector_content_time:.1f}ms")
                         if filtering_time > 0:
-                            print(f"         │  └─ Фильтрация: {filtering_time:.1f}ms")
+                            print(f"         │  └─ Filtering: {filtering_time:.1f}ms")
                     
-                    # Проверяем разницу между core_search и total_search_time
+                    # Check difference between core_search and total_search_time
                     total_search_time = session.search_metrics.get("total_search_time_ms", 0)
                     if total_search_time > 0 and abs(core_search_time - total_search_time) > 100:
                         overhead_time = core_search_time - total_search_time
-                        print(f"         │  └─ Накладные расходы: {overhead_time:.1f}ms")
+                        print(f"         │  └─ Overhead: {overhead_time:.1f}ms")
                 
                 if post_processing_time > 0:
-                    print(f"         └─ Пост-обработка: {post_processing_time:.1f}ms")
+                    print(f"         └─ Post-processing: {post_processing_time:.1f}ms")
             
-            # Генерация ответа
+            # Answer generation
             answer_time = session.performance_metrics.get("answer_generation_ms", 0)
             if answer_time > 0:
-                print(f"      💬 Генерация ответа: {answer_time:.1f}ms")
+                print(f"      💬 Answer generation: {answer_time:.1f}ms")
             
-            # Проверяем общую сумму
+            # Check total sum
             total_measured = detect_intent_time + route_search_time + answer_time
             if total_measured > 0 and abs(session.execution_time_ms - total_measured) > 100:
                 unaccounted_time = session.execution_time_ms - total_measured
-                print(f"\n   ⚠️  НЕУЧТЕННОЕ ВРЕМЯ: {unaccounted_time:.1f}ms")
-                print(f"      (возможно, время инициализации, сетевые задержки, etc.)")
+                print(f"\n   ⚠️  UNACCOUNTED TIME: {unaccounted_time:.1f}ms")
+                print(f"      (possibly initialization time, network delays, etc.)")
         
-        # ============= ФИНАЛЬНЫЙ РЕЗУЛЬТАТ =============
+        # ============= FINAL RESULT =============
         results_icon = "✅" if session.final_results_count > 0 else "❌"
-        print(f"\n🎯 ФИНАЛЬНЫЙ РЕЗУЛЬТАТ: {results_icon} {session.final_results_count} книг найдено")
+        print(f"\n🎯 FINAL RESULT: {results_icon} {session.final_results_count} books found")
         
-        # Показать все найденные книги
+        # Show all found books
         if session.final_books:
-            print(f"\n📚 НАЙДЕННЫЕ КНИГИ:")
+            print(f"\n📚 FOUND BOOKS:")
             for i, book in enumerate(session.final_books, 1):
-                title = book.get('title', 'Без названия')
-                author = book.get('author', 'Неизвестный автор')
+                title = book.get('title', 'Untitled')
+                author = book.get('author', 'Unknown author')
                 year = book.get('year', '')
                 year_str = f" ({year})" if year else ""
                 print(f"  {i}. \"{title}\" by {author}{year_str}")
                 
-                # Показать краткое описание если есть
+                # Show brief description if available
                 summary = book.get('summary', '')
                 if summary:
                     summary_preview = summary[:80] + "..." if len(summary) > 80 else summary
@@ -474,17 +474,17 @@ IMPORTANT: Always respond in Russian language."""
         
         if session.final_response:
             response_preview = session.final_response[:100] + "..." if len(session.final_response) > 100 else session.final_response
-            print(f"\n   💬 Ответ пользователю: '{response_preview}'")
+            print(f"\n   💬 User response: '{response_preview}'")
         
-        # ============= ПРОБЛЕМЫ =============
+        # ============= ISSUES =============
         if session.issues:
-            print(f"\n⚠️  ОБНАРУЖЕННЫЕ ПРОБЛЕМЫ:")
+            print(f"\n⚠️  DETECTED ISSUES:")
             for i, issue in enumerate(session.issues, 1):
                 print(f"  {i}. {issue}")
         
-        # ============= LLM АНАЛИЗ =============
+        # ============= LLM ANALYSIS =============
         if session.llm_analysis:
-            print(f"\n🤖 АНАЛИЗ ИИ: {session.llm_analysis}")
+            print(f"\n🤖 AI ANALYSIS: {session.llm_analysis}")
         
         print(f"{'='*100}\n")
 
@@ -509,25 +509,25 @@ def add_debug_issue(issue: str):
     """Add debug issue"""
     debug_reporter.add_issue(issue)
     
-# Новые convenience functions
+# New convenience functions
 def set_debug_query_processing(simple_query: bool = False, mixed_filters: bool = False, predicate_filter: bool = False):
-    """Записать флаги обработки запроса"""
+    """Record query processing flags"""
     debug_reporter.set_query_processing(simple_query, mixed_filters, predicate_filter)
     
 def set_debug_search_queries(bm25_query: str = "", vector_query: str = ""):
-    """Записать поисковые запросы"""
+    """Record search queries"""
     debug_reporter.set_search_queries(bm25_query, vector_query)
     
 def add_debug_filtered_result(result_info: Dict[str, Any]):
-    """Записать решение о фильтрации"""
+    """Record filtering decision"""
     debug_reporter.add_filtered_result(result_info)
     
 def set_debug_final_response(response: str):
-    """Записать финальный ответ пользователю"""
+    """Record final response to user"""
     debug_reporter.set_final_response(response)
 
 def set_debug_final_books(books: List[Dict[str, Any]]):
-    """Записать финальные книги"""
+    """Record final books"""
     debug_reporter.set_final_books(books)
 
 def finalize_debug(final_results_count: int, execution_time_ms: float = 0.0):
