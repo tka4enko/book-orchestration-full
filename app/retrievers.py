@@ -278,8 +278,28 @@ def isbn_exact(query: str) -> List[Document]:
     logger.info("    🔍 Searching Chroma books collection...")
     
     b = books_store()._collection
-    where = {"isbn13": norm["isbn13"]}
-    found = b.get(where=where, include=["documents","metadatas"])
+    
+    # Поиск по обоим ISBN форматам
+    found_isbn13 = b.get(where={"isbn13": norm["isbn13"]}, include=["documents","metadatas"])
+    found_isbn10 = b.get(where={"isbn10": norm["isbn10"]}, include=["documents","metadatas"]) if norm["isbn10"] else {"documents": [], "metadatas": []}
+    
+    # Объединяем результаты, избегая дубликатов
+    all_docs = (found_isbn13.get("documents") or []) + (found_isbn10.get("documents") or [])
+    all_metas = (found_isbn13.get("metadatas") or []) + (found_isbn10.get("metadatas") or [])
+    
+    # Убираем дубликаты по document_id
+    seen_ids = set()
+    unique_docs = []
+    unique_metas = []
+    
+    for doc, meta in zip(all_docs, all_metas):
+        doc_id = meta.get('document_id')
+        if doc_id not in seen_ids:
+            seen_ids.add(doc_id)
+            unique_docs.append(doc)
+            unique_metas.append(meta)
+    
+    found = {"documents": unique_docs, "metadatas": unique_metas}
     
     docs = [Document(page_content=t, metadata=m) for t,m in zip(found.get("documents") or [], found.get("metadatas") or [])]
     
@@ -810,7 +830,7 @@ class OptimizedThresholdRetriever:
             # STEP 3: Diversified vector search in content collection
             vector_content_start_time = time.time()
             logger.info("    📄 Step 3: Diversified vector search in content collection...")
-            content_results_raw = diversified_content_search(query, k=20)
+            content_results_raw = diversified_content_search(query, total_limit=20)
             vector_content_time = (time.time() - vector_content_start_time) * 1000
             logger.info(f"⏱️ [retrievers.py] Vector content search completed in {vector_content_time:.1f}ms")
             logger.info(f"        📄 Retrieved {len(content_results_raw)} diversified content chunks")
