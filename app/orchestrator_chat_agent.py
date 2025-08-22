@@ -11,39 +11,39 @@ from .simple_orchestrator import process_simple_search
 logger = logging.getLogger(__name__)
 
 class ChatAgentState(BaseModel):
-    # Базовые поля
+    # Base fields
     session_id: str
-    message: str  # Текущее сообщение пользователя
+    message: str  # Current user message
     
-    # История всей сессии (накапливается между вызовами)
+    # Session history (accumulates between calls)
     conversation_history: List[Dict[str, Any]] = Field(default_factory=list)
     
-    # Поля для чат-агента
-    chat_history: List[Dict[str, str]] = Field(default_factory=list)  # Deprecated, используем conversation_history
+    # Chat agent fields
+    chat_history: List[Dict[str, str]] = Field(default_factory=list)  # Deprecated, use conversation_history
     reply_message: Optional[str] = None
     chips: List[Dict[str, str]] = Field(default_factory=list)
     should_search: bool = False
     should_recommend: bool = False
     
-    # Намерение пользователя (определяется в node_intent)
+    # User intent (determined in node_intent)
     intent: Optional[str] = None
     
-    # Результаты (унифицированные для чата и поиска)
+    # Results (unified for chat and search)
     results: List[Dict[str, Any]] = Field(default_factory=list)
     
-    # Метрики производительности
+    # Performance metrics
     performance_metrics: Dict[str, float] = Field(default_factory=dict)
 
-# LLM используется только для рекомендаций, не для роутинга
+# LLM is used only for recommendations, not for routing
 llm = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0.7, api_key=OPENAI_API_KEY)
 
 def _format_chat_history(history: List[Dict[str, str]]) -> str:
-    """Форматирует историю чата для промпта"""
+    """Formats chat history for prompt"""
     if not history:
-        return "Пустая история"
+        return "Empty history"
     
     formatted = []
-    for entry in history[-5:]:  # Последние 5 сообщений
+    for entry in history[-5:]:  # Last 5 messages
         role = entry.get("role", "user")
         content = entry.get("content", "")
         formatted.append(f"{role}: {content}")
@@ -51,12 +51,12 @@ def _format_chat_history(history: List[Dict[str, str]]) -> str:
     return "\n".join(formatted)
 
 def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
-    """Простой чат ответ без LLM анализа"""
+    """Simple chat response without LLM analysis"""
     start_time = time.time()
     
-    logger.info("💬 [chat_agent] node_chat_response_simple - Простой чат ответ...")
+    logger.info("💬 [chat_agent] node_chat_response_simple - Simple chat response...")
     
-    # Добавляем пользовательское сообщение в историю
+    # Add user message to history
     if not state.chat_history:
         state.chat_history = []
     
@@ -66,30 +66,30 @@ def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
     })
     
     try:
-        # Простые ответы на основе ключевых слов
+        # Simple responses based on keywords
         message_lower = state.message.lower()
         
         if any(greeting in message_lower for greeting in ["привет", "здравствуй", "hello", "hi"]):
-            reply = "Привет! Как дела? Чем могу помочь с книгами?"
+            reply = "Hello! How are you? How can I help you with books?"
             chips = [
-                {"text": "Найти книгу", "action": "search"},
-                {"text": "Порекомендуй что-то", "action": "recommend"}
+                {"text": "Find a book", "action": "search"},
+                {"text": "Recommend something", "action": "recommend"}
             ]
         elif any(phrase in message_lower for phrase in ["не знаю", "скучно", "что делать"]):
-            reply = "Понимаю! Может, почитаем что-то интересное? Какой жанр нравится?"
+            reply = "I understand! Maybe let's read something interesting? What genre do you like?"
             chips = [
-                {"text": "Детектив", "action": "search"}, 
-                {"text": "Фантастика", "action": "search"},
-                {"text": "Посоветуй сам", "action": "recommend"}
+                {"text": "Detective", "action": "search"}, 
+                {"text": "Fantasy", "action": "search"},
+                {"text": "Recommend yourself", "action": "recommend"}
             ]
         else:
-            reply = "Интересно! Расскажи больше - что именно тебя интересует?"
+            reply = "Interesting! Tell me more - what exactly interests you?"
             chips = [
-                {"text": "Найти конкретную книгу", "action": "search"},
-                {"text": "Дай рекомендации", "action": "recommend"}
+                {"text": "Find a specific book", "action": "search"},
+                {"text": "Give recommendations", "action": "recommend"}
             ]
         
-        # Формируем результат
+        # Form result
         state.results = [{
             "message": reply,
             "intent": "chat",
@@ -97,7 +97,7 @@ def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
             "chat_mode": True
         }]
         
-        # Добавляем в историю
+        # Add to history
         state.chat_history.append({
             "role": "assistant",
             "content": reply
@@ -138,37 +138,37 @@ def node_chat_response(state: ChatAgentState) -> ChatAgentState:
     return state
 
 async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
-    """Генерирует рекомендации на основе того что есть в ChromaDB"""
-    logger.info("💡 [chat_agent] node_recommendations - Генерируем рекомендации из базы...")
+    """Generates recommendations based on what's in ChromaDB"""
+    logger.info("💡 [chat_agent] node_recommendations - Generating recommendations from database...")
     
     start_time = time.time()
     
     try:
-        # Подключаемся к ChromaDB для получения статистики и реальных жанров
+        # Connect to ChromaDB to get statistics and real genres
         from .simple_retriever import SimpleVectorRetriever
         
         retriever = SimpleVectorRetriever()
         stats = retriever.get_collection_stats()
         
-        logger.info(f"📊 Статистика базы: books={stats['books']}, content={stats['content']}")
+        logger.info(f"📊 Database statistics: books={stats['books']}, content={stats['content']}")
         
         if stats['books'] > 0:
-            # Получаем реальные жанры из БД
+            # Get real genres from database
             try:
-                # Делаем запрос к коллекции книг для получения метаданных
-                sample_results = await retriever.search("", k=20)  # Получаем книги для анализа жанров
+                # Query books collection to get metadata
+                sample_results = await retriever.search("", k=20)  # Get books for genre analysis
                 
-                # Извлекаем уникальные жанры из метаданных
+                # Extract unique genres from metadata
                 genres = set()
                 authors = set()
                 
-                logger.info(f"📊 Анализируем {len(sample_results)} результатов для извлечения жанров")
+                logger.info(f"📊 Analyzing {len(sample_results)} results to extract genres")
                 
                 for i, result in enumerate(sample_results):
                     metadata = result.get('metadata', {})
-                    logger.info(f"📖 Результат {i}: metadata = {metadata}")
+                    logger.info(f"📖 Result {i}: metadata = {metadata}")
                     
-                    # Извлекаем жанры из правильных полей
+                    # Extract genres from correct fields
                     # Primary genre  
                     primary_genre = metadata.get('primary_genre', '')
                     if primary_genre:
@@ -185,49 +185,49 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
                         except:
                             pass
                     
-                    # Авторы для разнообразия
+                    # Authors for diversity
                     author = metadata.get('author', '')
                     if author and author != 'Unknown':
                         authors.add(author)
                 
-                logger.info(f"🎯 Найденные жанры: {list(genres)}")
-                logger.info(f"👤 Найденные авторы: {list(authors)}")
+                logger.info(f"🎯 Found genres: {list(genres)}")
+                logger.info(f"👤 Found authors: {list(authors)}")
                 
-                # Формируем чипы на основе реальных данных
+                # Form chips based on real data
                 chips = []
                 
-                # Добавляем реальные жанры (максимум 4)
+                # Add real genres (maximum 4)
                 real_genres = list(genres)[:4]
                 for genre in real_genres:
                     chips.append({"text": genre, "action": "search"})
                 
-                # Добавляем популярных авторов (максимум 2)
+                # Add popular authors (maximum 2)
                 popular_authors = list(authors)[:2]
                 for author in popular_authors:
                     chips.append({"text": author, "action": "search"})
                 
-                # Если нет данных, используем общие варианты
+                # If no data, use general options
                 if not chips:
                     chips = [
-                        {"text": "Покажи всё что есть", "action": "search"},
-                        {"text": "Случайная книга", "action": "search"}
+                        {"text": "Show everything available", "action": "search"},
+                        {"text": "Random book", "action": "search"}
                     ]
                 
-                reply = "Ниже я предоставил несколько интересных вариантов из моей коллекции:"
+                reply = "Below I've provided several interesting options from my collection:"
                 
             except Exception as e:
-                logger.error(f"❌ Ошибка получения жанров: {e}")
-                # Fallback к простым вариантам
-                reply = "Ниже я предоставил несколько вариантов из моей коллекции:"
+                logger.error(f"❌ Error getting genres: {e}")
+                # Fallback to simple options
+                reply = "Below I've provided several options from my collection:"
                 chips = [
-                    {"text": "Покажи всё что есть", "action": "search"},
-                    {"text": "Случайная книга", "action": "search"}
+                    {"text": "Show everything available", "action": "search"},
+                    {"text": "Random book", "action": "search"}
                 ]
         else:
-            reply = "К сожалению, база книг пока пуста. Попробуйте загрузить несколько книг сначала."
+            reply = "Unfortunately, the book database is empty. Try uploading some books first."
             chips = []
         
-        # Формируем результат
+        # Form result
         state.results = [{
             "message": reply,
             "intent": "recommendations",
@@ -235,7 +235,7 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
             "recommendation_mode": True
         }]
         
-        # Добавляем в историю чата
+        # Add to chat history
         if not state.chat_history:
             state.chat_history = []
         
@@ -269,14 +269,14 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
         return state
 
 async def node_intent(state: ChatAgentState) -> ChatAgentState:
-    """Node для анализа намерения пользователя"""
+    """Node for analyzing user intent"""
     message = state.message
     
-    logger.info(f"🧠 [node_intent] Анализ намерения: '{message}'")
-    logger.info(f"📜 [node_intent] История сессии: {len(state.conversation_history)} сообщений")
+    logger.info(f"🧠 [node_intent] Intent analysis: '{message}'")
+    logger.info(f"📜 [node_intent] Session history: {len(state.conversation_history)} messages")
     logger.info(f"🆔 [node_intent] Session ID: {state.session_id}")
     
-    # Добавляем текущее сообщение в историю сессии
+    # Add current message to session history
     state.conversation_history.append({
         "role": "user",
         "content": message,
@@ -284,54 +284,54 @@ async def node_intent(state: ChatAgentState) -> ChatAgentState:
     })
     
     try:
-        # Быстрый LLM запрос для роутинга
-        router_prompt = f"""Ты роутер поиска книг. Определи можно ли найти книги по этому запросу.
+        # Quick LLM request for routing
+        router_prompt = f"""You are a book search router. Determine if books can be found for this query.
 
-SEARCH - если есть ЛЮБАЯ поисковая информация:
-- Автор или название книги
-- Жанр или тематика  
-- Год издания или период
-- Описание сюжета или содержания
-- Темы и топики книги
-- Язык книги
-- ISBN номер
-- Любые конкретные детали о книге
+SEARCH - if there is ANY search information:
+- Author or book title
+- Genre or topic  
+- Publication year or period
+- Plot or content description
+- Book themes and topics
+- Book language
+- ISBN number
+- Any specific details about the book
 
-RECOMMEND - просьбы о советах и рекомендациях
+RECOMMEND - requests for advice and recommendations
 
-CLARIFY - только очень общие запросы БЕЗ конкретики:
-- "найди книгу" (без указания какую)
-- "ищу что-то почитать" (без деталей)
+CLARIFY - only very general queries WITHOUT specifics:
+- "find a book" (without specifying which one)
+- "looking for something to read" (without details)
 
-CHAT - обычное общение, не связанное с поиском книг
+CHAT - regular conversation not related to book search
 
-Запрос: "{message}"
+Query: "{message}"
 
-ВАЖНО: Любые жанры и тематики - это SEARCH!
-Можно ли найти конкретные книги по этому запросу?
-Ответ (SEARCH/RECOMMEND/CLARIFY/CHAT):"""
+IMPORTANT: Any genres and topics - this is SEARCH!
+Can specific books be found for this query?
+Answer (SEARCH/RECOMMEND/CLARIFY/CHAT):"""
         
         response = llm.invoke([("user", router_prompt)]).content.strip().upper()
         
-        logger.info(f"🧠 [router] LLM ответ: '{response}'")
+        logger.info(f"🧠 [router] LLM response: '{response}'")
         
-        # Сохраняем результат анализа в state
+        # Save analysis result in state
         state.intent = response
         
-        logger.info(f"✅ [node_intent] Намерение определено: '{response}'")
+        logger.info(f"✅ [node_intent] Intent determined: '{response}'")
         
         return state
         
     except Exception as e:
-        logger.error(f"❌ [node_intent] Ошибка анализа: {e}")
+        logger.error(f"❌ [node_intent] Analysis error: {e}")
         state.intent = "CHAT"  # Fallback
         return state
 
 def route_by_intent(state: ChatAgentState) -> str:
-    """Роутинг на основе определенного намерения"""
+    """Routing based on determined intent"""
     intent = state.intent
     
-    logger.info(f"🔄 [route_by_intent] Роутинг для намерения: '{intent}'")
+    logger.info(f"🔄 [route_by_intent] Routing for intent: '{intent}'")
     
     if "SEARCH" in intent:
         logger.info(f"🔍 [route_by_intent] → simple_search")
@@ -347,19 +347,19 @@ def route_by_intent(state: ChatAgentState) -> str:
         return "chat_response"
 
 async def node_simple_search(state: ChatAgentState) -> ChatAgentState:
-    """Выполняет простой поиск используя process_simple_search"""
-    logger.info("🔍 [chat_agent] node_simple_search - Используем simple_orchestrator...")
+    """Performs simple search using process_simple_search"""
+    logger.info("🔍 [chat_agent] node_simple_search - Using simple_orchestrator...")
     
     start_time = time.time()
     
     try:
-        # Вызываем простой поиск
+        # Call simple search
         search_result = await process_simple_search(state.session_id, state.message)
         
-        # Используем готовый форматированный ответ из simple_orchestrator
-        message = search_result.get('response', 'Результаты не найдены')
+        # Use ready formatted response from simple_orchestrator
+        message = search_result.get('response', 'Results not found')
         
-        # Добавляем в результаты
+        # Add to results
         state.results = [{
             "message": message,
             "intent": search_result.get('intent', 'search'),
@@ -409,9 +409,9 @@ def node_clarify(state: ChatAgentState) -> ChatAgentState:
     """Запрашивает уточнение у пользователя"""
     start_time = time.time()
     
-    logger.info("❓ [chat_agent] node_clarify - Запрос уточнения...")
+    logger.info("❓ [chat_agent] node_clarify - Clarification request...")
     
-    # Добавляем пользовательское сообщение в историю
+    # Add user message to history
     if not state.chat_history:
         state.chat_history = []
     
@@ -421,35 +421,35 @@ def node_clarify(state: ChatAgentState) -> ChatAgentState:
     })
     
     try:
-        # Формируем ответ с запросом уточнения
+        # Form response with clarification request
         message_lower = state.message.lower()
         
         if any(word in message_lower for word in ["найти", "найду", "ищу", "поиск"]):
-            reply = "Что именно вы хотите найти? Укажите автора, название книги или жанр."
+            reply = "What exactly do you want to find? Specify author, book title or genre."
             chips = [
-                {"text": "Автор", "action": "search"},
-                {"text": "Название книги", "action": "search"},
-                {"text": "Жанр", "action": "search"},
-                {"text": "Посоветуй сам", "action": "recommend"}
+                {"text": "Author", "action": "search"},
+                {"text": "Book title", "action": "search"},
+                {"text": "Genre", "action": "search"},
+                {"text": "Recommend yourself", "action": "recommend"}
             ]
         elif any(word in message_lower for word in ["книг", "читать", "литератур"]):
-            reply = "Какой тип книг вас интересует? Можете указать жанр или конкретные предпочтения."
+            reply = "What type of books interest you? You can specify genre or specific preferences."
             chips = [
-                {"text": "Фантастика", "action": "search"},
-                {"text": "Детектив", "action": "search"},
-                {"text": "Классика", "action": "search"},
-                {"text": "Дай рекомендации", "action": "recommend"}
+                {"text": "Fantasy", "action": "search"},
+                {"text": "Detective", "action": "search"},
+                {"text": "Classic", "action": "search"},
+                {"text": "Give recommendations", "action": "recommend"}
             ]
         else:
-            reply = "Могу помочь найти книги! Что именно вас интересует?"
+            reply = "I can help find books! What exactly interests you?"
             chips = [
-                {"text": "Конкретная книга", "action": "search"},
-                {"text": "Автор", "action": "search"},
-                {"text": "Жанр", "action": "search"},
-                {"text": "Посоветуй что-то", "action": "recommend"}
+                {"text": "Specific book", "action": "search"},
+                {"text": "Author", "action": "search"},
+                {"text": "Genre", "action": "search"},
+                {"text": "Recommend something", "action": "recommend"}
             ]
         
-        # Формируем результат
+        # Form result
         state.results = [{
             "message": reply,
             "intent": "clarify",
@@ -457,40 +457,40 @@ def node_clarify(state: ChatAgentState) -> ChatAgentState:
             "clarify_mode": True
         }]
         
-        # Добавляем в историю
+        # Add to history
         state.chat_history.append({
             "role": "assistant",
             "content": reply
         })
         
     except Exception as e:
-        logger.error(f"❌ Ошибка в node_clarify: {e}")
+        logger.error(f"❌ Error in node_clarify: {e}")
         state.results = [{
-            "message": "Чем могу помочь? Ищете что-то конкретное?",
+            "message": "How can I help? Looking for something specific?",
             "intent": "error",
-            "chips": [{"text": "Найти книги", "action": "search"}]
+            "chips": [{"text": "Find books", "action": "search"}]
         }]
     
     execution_time = (time.time() - start_time) * 1000
     state.performance_metrics["clarify_ms"] = execution_time
-    logger.info(f"⏱️ [chat_agent] Уточнение завершено за {execution_time:.1f}ms")
+    logger.info(f"⏱️ [chat_agent] Clarification completed in {execution_time:.1f}ms")
     
     return state
 
-# Создание графа
+# Graph creation
 builder = StateGraph(ChatAgentState)
 
-# Добавляем узлы
-builder.add_node("intent", node_intent)  # Новый node для анализа намерения
+# Add nodes
+builder.add_node("intent", node_intent)  # New node for intent analysis
 builder.add_node("chat_response", node_chat_response_simple)
 builder.add_node("recommendations", node_recommendations)
 builder.add_node("simple_search", node_simple_search)
 builder.add_node("clarify", node_clarify)
 
-# Новая архитектура: сначала анализ намерения, потом роутинг
+# New architecture: first intent analysis, then routing
 builder.set_entry_point("intent")
 
-# Условный роутинг после анализа намерения
+# Conditional routing after intent analysis
 builder.add_conditional_edges(
     "intent",
     route_by_intent,
@@ -502,7 +502,7 @@ builder.add_conditional_edges(
     }
 )
 
-# Завершение
+# Completion
 builder.add_edge("chat_response", END)
 builder.add_edge("recommendations", END)
 builder.add_edge("simple_search", END)

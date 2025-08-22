@@ -36,7 +36,7 @@ def test_simple_chat(query: str, session_id: str = "test_simple"):
             print(f"   Анализ: {data.get('analysis', 'N/A')}")
             print(f"   Результатов: {len(data.get('results', []))}")
             
-            # Показываем результаты
+            # Show results
             results = data.get('results', [])
             for i, result in enumerate(results, 1):
                 title = result.get('title', 'Unknown')
@@ -50,7 +50,7 @@ def test_simple_chat(query: str, session_id: str = "test_simple"):
             print(f"\n💬 Ответ пользователю:")
             print(f"   {data.get('response', 'N/A')}")
             
-            # Метрики производительности
+            # Performance metrics
             perf_metrics = data.get('performance_metrics', {})
             search_stats = data.get('search_stats', {})
             
@@ -89,11 +89,11 @@ def main():
     """Запуск тестов"""
     
     if len(sys.argv) > 1:
-        # Используем переданный запрос
+        # Use provided query
         query = " ".join(sys.argv[1:])
         test_simple_chat(query)
     else:
-        # Набор тестовых запросов
+        # Set of test queries
         test_queries = [
             "найди книги Орвелла",
             "1984 Оруэлл",

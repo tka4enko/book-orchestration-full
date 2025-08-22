@@ -1,79 +1,81 @@
-# 📚 BookBot Full - Интеллектуальная система поиска книг с чат-интерфейсом
+# 📚 BookBot - Intelligent Book Search System with Chat Interface
 
-**BookBot Full** - это продвинутая AI-система для поиска книг, которая объединяет мощный гибридный поиск, интеллектуальное определение намерений, многоуровневую детекцию дубликатов и современный чат-интерфейс с поддержкой WebSocket для реального времени.
+**BookBot** is an advanced AI-powered book search system that combines vector search, intelligent intent detection, and a modern chat interface with WebSocket support for real-time communication.
 
-## 🎯 Ключевые особенности
+## 🎯 Key Features
 
-### 🔍 Интеллектуальный поиск
-- **Гибридный поиск** - оптимальное сочетание BM25 (ключевые слова) и векторного поиска (семантика)
-- **Умное определение намерений** - автоматическое распознавание типа запроса (ISBN, автор, жанр, тема)
-- **Адаптивные пороги схожести** - динамическая настройка на основе языка и типа запроса
-- **Диверсификация результатов** - предотвращение доминирования одной книги в результатах
+### 🔍 Intelligent Search
 
-### 🧠 AI-возможности
-- **LangGraph оркестрация** - сложные пайплайны обработки запросов
-- **Контекстный чат** - поддержка истории диалога и контекстных ответов
-- **LLM-анализ метаданных** - автоматическое извлечение информации о книгах
-- **Детекция языка** - многоязычная поддержка с русским приоритетом
+- **Vector Search** - semantic search using OpenAI embeddings
+- **Smart Intent Detection** - automatic recognition of query types (ISBN, author, genre, topic)
+- **LLM Filtering** - AI-powered result filtering and analysis
+- **Real-time Chat** - interactive conversation with context awareness
 
-### 💬 Чат-интерфейс
-- **Два режима работы** - классический поиск и интерактивный чат
-- **WebSocket поддержка** - общение в реальном времени
-- **Умные чипсы** - предлагаемые действия и продолжения диалога
-- **Контекстные советы** - направление пользователя к поиску книг
+### 🧠 AI Capabilities
 
-### 🛡️ Защита от дубликатов
-- **4-уровневая детекция** - хеш файла, ISBN, метаданные, содержимое
-- **Гибкая конфигурация** - настраиваемые пороги и принудительная загрузка
-- **Хранение хешей** - постоянное отслеживание загруженных файлов
+- **LangGraph Orchestration** - structured request processing pipelines
+- **Contextual Chat** - conversation history and contextual responses
+- **LLM Metadata Analysis** - automatic book information extraction
+- **Language Detection** - multilingual support
 
-## 🏗️ Архитектура системы
+### 💬 Chat Interface
+
+- **Interactive Mode** - conversational book discovery
+- **WebSocket Support** - real-time communication
+- **Smart Chips** - suggested actions and conversation continuations
+- **Contextual Guidance** - directing users to book search
+
+## 🏗️ System Architecture
 
 ```
 bookbot_full/
 ├── app/
-│   ├── main.py                      # FastAPI сервер + WebSocket
-│   ├── orchestrator.py              # Классический поисковый пайплайн
-│   ├── orchestrator_with_chat.py    # Чат-пайплайн с контекстом
-│   ├── retrievers.py               # Гибридные алгоритмы поиска
-│   ├── ingest.py                   # Загрузка и обработка документов
-│   ├── loaders.py                  # Загрузчики файлов (PDF, DOCX, TXT)
-│   ├── metadata.py                 # Обработка метаданных
-│   ├── metadata_llm.py             # LLM для анализа контента
-│   ├── duplicate_detection.py      # Многоуровневая детекция дубликатов
-│   ├── file_hash_store.py          # Хранилище хешей файлов
-│   ├── utils_isbn.py               # ISBN нормализация и валидация
-│   ├── settings.py                 # Конфигурация системы
+│   ├── main.py                      # FastAPI server + WebSocket
+│   ├── simple_orchestrator.py       # Simple search pipeline
+│   ├── orchestrator_chat_agent.py   # Chat agent with thread persistence
+│   ├── simple_retriever.py          # Vector search algorithms
+│   ├── simple_llm_filter.py         # LLM result filtering
+│   ├── ingest.py                    # Document loading and processing
+│   ├── loaders.py                   # File loaders (PDF, DOCX, TXT)
+│   ├── metadata.py                  # Metadata processing
+│   ├── metadata_llm.py              # LLM content analysis
+│   ├── duplicate_detection.py       # Multi-level duplicate detection
+│   ├── file_hash_store.py           # File hash storage
+│   ├── utils_isbn.py                # ISBN normalization and validation
+│   ├── settings.py                  # System configuration
 │   └── static/
-│       ├── index.html              # Основной веб-интерфейс
-│       └── chat_test.html          # Тестовый чат-интерфейс
-└── requirements.txt                # Python зависимости
+│       ├── index.html               # Main web interface
+│       ├── chat_agent.html          # Chat interface
+│       └── simple_chat.html         # Simple chat test interface
+└── requirements.txt                 # Python dependencies
 ```
 
-## 💻 Технологический стек
+## 💻 Technology Stack
 
 ### Backend
-- **FastAPI** - высокопроизводительный веб-фреймворк
-- **LangChain** - фреймворк для LLM приложений  
-- **LangGraph** - граф-оркестрация AI пайплайнов
-- **ChromaDB** - векторная база данных с персистентностью
-- **BM25** - алгоритм ранжирования по ключевым словам
-- **WebSocket** - реальное время для чата
 
-### AI Модели
-- **OpenAI GPT-4o-mini** - языковая модель для чата и анализа
-- **text-embedding-3-small** - векторные эмбеддинги
-- **LangSmith** - мониторинг и трассировка LLM
+- **FastAPI** - high-performance web framework
+- **LangChain** - LLM application framework
+- **LangGraph** - graph orchestration for AI pipelines
+- **ChromaDB** - vector database with persistence
+- **WebSocket** - real-time chat support
 
-### Обработка данных
-- **PyPDF2** - обработка PDF документов
-- **python-docx** - обработка Word документов
-- **isbnlib** - работа с ISBN номерами
-- **langdetect** - детекция языков
+### AI Models
 
-## 🚀 Быстрый старт
+- **OpenAI GPT-4o-mini** - language model for chat and analysis
+- **text-embedding-3-small** - vector embeddings
+- **LangSmith** - LLM monitoring and tracing
 
-### 1. Установка
+### Data Processing
+
+- **PyPDF2** - PDF document processing
+- **python-docx** - Word document processing
+- **isbnlib** - ISBN number handling
+- **langdetect** - language detection
+
+## 🚀 Quick Start
+
+### 1. Installation
 
 ```bash
 git clone <repository-url>
@@ -81,9 +83,9 @@ cd bookbot_full
 pip install -r requirements.txt
 ```
 
-### 2. Настройка окружения
+### 2. Environment Setup
 
-Создайте `.env` файл:
+Create a `.env` file:
 
 ```env
 # OpenAI API
@@ -91,117 +93,125 @@ OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL_CHAT=gpt-4o-mini
 OPENAI_MODEL_EMBED=text-embedding-3-small
 
-# База данных
+# Database
 CHROMA_DIR=.chroma
 
-# Сервер
+# Server
 HOST=127.0.0.1
 PORT=8000
 
-# LangSmith (опционально)
+# LangSmith (optional)
 LANGSMITH_TRACING=true
 LANGSMITH_PROJECT=bookbot
 LANGSMITH_API_KEY=your_langsmith_key
 LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 
-# Настройки поиска (опционально)
+# Search settings (optional)
 MAX_CHUNKS_PER_BOOK=2
 CHUNKS_PER_BOOK_IN_CONTENT=2
 CONTENT_SEARCH_EXPAND_K=20
-
-# JSON конфигурации (опционально)
-SIMILARITY_THRESHOLDS={"author": 0.8, "title": 0.7, "topic": 0.4, "free_text": 0.5}
-BM25_THRESHOLDS={"author": 0.1, "title": 0.1, "topic": 0.6, "free_text": 0.4}
-LANGUAGE_THRESHOLD_MODIFIERS={"same_language": -0.1, "different_language": 0.0}
 ```
 
-### 3. Запуск
+### 3. Launch
 
 ```bash
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### 4. Доступ
+### 4. Access
 
-- **Веб-интерфейс**: http://127.0.0.1:8000
-- **Чат-тест**: http://127.0.0.1:8000/chat_test
-- **API документация**: http://127.0.0.1:8000/docs
-- **Health check**: http://127.0.0.1:8000/health
+- **Web Interface**: http://127.0.0.1:8000
+- **Chat Interface**: http://127.0.0.1:8000/chat_agent
+- **Simple Chat Test**: http://127.0.0.1:8000/simple_chat
+- **API Documentation**: http://127.0.0.1:8000/docs
+- **Health Check**: http://127.0.0.1:8000/health
 
-## 📖 Использование
+## 📖 Usage
 
-### Веб-интерфейсы
+### Web Interfaces
 
-#### Основной интерфейс (`/`)
-- Стандартный поиск с форматированными результатами
-- Поддержка всех типов запросов
-- JSON ответы с детальной информацией
+#### Main Interface (`/`)
 
-#### Чат-интерфейс (`/chat_test`)
-- Диалоговый режим с историей
-- WebSocket соединение в реальном времени
-- Контекстные подсказки и чипсы
-- Умное переключение между чатом и поиском
+- Standard search with formatted results
+- Support for all query types
+- JSON responses with detailed information
 
-### API Эндпоинты
+#### Chat Interface (`/chat_agent`)
 
-#### Поиск книг
+- Conversational mode with history
+- WebSocket real-time connection
+- Contextual hints and chips
+- Smart switching between chat and search
+
+### API Endpoints
+
+#### Book Search
+
 ```bash
 POST /chat
 Content-Type: application/json
 
 {
   "session_id": "unique_session_id",
-  "message": "найди книги Орвелла"
+  "message": "find books by Orwell"
 }
 ```
 
-Ответ:
+Response:
+
 ```json
 {
   "session_id": "unique_session_id",
   "intent": "author",
-  "results": [{
-    "message": "1. «1984» от George Orwell - Антиутопия о тотальном контроле",
+  "results": [
+    {
+      "message": "1. «1984» by George Orwell - Dystopian novel about totalitarian control",
     "intent": "author"
-  }]
+    }
+  ]
 }
 ```
 
-#### Чат через WebSocket
+#### Chat via WebSocket
+
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/chat_test');
-ws.send(JSON.stringify({
-  "session_id": "test_session",
-  "message": "привет, посоветуй что почитать"
-}));
+const ws = new WebSocket("ws://localhost:8000/ws/chat_agent");
+ws.send(
+  JSON.stringify({
+    session_id: "test_session",
+    message: "hello, recommend something to read",
+  })
+);
 ```
 
-Ответ:
+Response:
+
 ```json
 {
-  "reply": "Привет! Что тебя интересует?",
+  "reply": "Hello! What interests you?",
   "cards": [],
   "chips": [
-    {"text": "Детектив", "action": "search"},
-    {"text": "Фэнтези", "action": "search"}
+    { "text": "Detective", "action": "search" },
+    { "text": "Fantasy", "action": "search" }
   ],
   "intent": "chat"
 }
 ```
 
-#### Загрузка книг
+#### Book Upload
+
 ```bash
 POST /ingest
 Content-Type: multipart/form-data
 
-file: [PDF/DOCX/TXT файл]
-meta: {"title": "Название", "author": "Автор", "prefer_llm": true}
+file: [PDF/DOCX/TXT file]
+meta: {"title": "Title", "author": "Author", "prefer_llm": true}
 max_chunks: 50
 force_ingest: false
 ```
 
-С детекцией дубликатов:
+With duplicate detection:
+
 ```json
 {
   "status": "duplicate_detected",
@@ -212,296 +222,230 @@ force_ingest: false
 }
 ```
 
-#### Просмотр коллекций
+#### Collection View
+
 ```bash
-# Книги (мастер-записи)
+# Books (master records)
 GET /vector-store/collection/books?limit=10
 
-# Контент (фрагменты)  
+# Content (chunks)
 GET /vector-store/collection/content?limit=10
 
-# Конкретная книга
+# Specific book
 GET /vector-store/collection/books/chunks?document_id=book-id-123
 
-# Поиск в коллекции
-GET /vector-store/collection/books/search?q=Орвелл&k=5
+# Search in collection
+GET /vector-store/collection/books/search?q=Orwell&k=5
 
-# Отдельный фрагмент
+# Individual chunk
 GET /vector-store/chunk/books/book-id-123
 ```
 
-## 🔍 Алгоритмы поиска
+## 🔍 Search Algorithms
 
-### Гибридный поиск (OptimizedThresholdRetriever)
+### Simple Vector Search (SimpleVectorRetriever)
 
-Многоэтапный пайплайн с приоритетами:
+Two-stage pipeline with optimization:
 
 ```
-1. BM25 поиск по ключевым словам (приоритет)
-   ├─ Точные совпадения в метаданных
-   ├─ Фильтрация по BM25-порогам
-   └─ Исключение из векторного поиска
+1. Vector Search in Books Collection
+   ├─ Semantic search in master records
+   ├─ Score-based filtering
+   └─ Top results selection
 
-2. Векторный поиск (дополнение)
-   ├─ Семантический поиск в книгах
-   ├─ Диверсифицированный поиск в контенте  
-   └─ Фильтрация по similarity-порогам
+2. Vector Search in Content Collection
+   ├─ Semantic search in text chunks
+   ├─ Grouping by books
+   └─ Best chunk selection per book
 
-3. Умная дедупликация
-   ├─ Группировка по книгам
-   ├─ Объединение мастер + лучший фрагмент
-   └─ Приоритет мастер-записей
+3. Smart Merging
+   ├─ Combine master + best chunk
+   ├─ Remove duplicates
+   └─ Final ranking
 ```
 
-### Определение намерений
+### Intent Detection
 
-LLM анализирует запросы и контекст для определения типа:
+LLM analyzes queries and context to determine type:
 
 ```python
-# Точный поиск
-"isbn": "978-1234567890"        # ISBN номер
-"author": "Стивен Кинг"         # Автор
-"title": "1984"                 # Название
-"author_title": "Кинг Сияние"   # Автор + название
+# Exact search
+"isbn": "978-1234567890"        # ISBN number
+"author": "Stephen King"         # Author
+"title": "1984"                 # Title
+"author_title": "King Shining"   # Author + title
 
-# Семантический поиск  
-"genre": "детектив"             # Жанр
-"topic": "психология"           # Тема
-"free_text": "интересная книга" # Свободный текст
+# Semantic search
+"genre": "detective"             # Genre
+"topic": "psychology"            # Topic
+"free_text": "interesting book"  # Free text
 
-# Чат
-"greeting": "привет"            # Приветствие
-"clarify": "посоветуй жанр"     # Нужен совет
-"chat": "как дела?"             # Общение
+# Chat
+"greeting": "hello"              # Greeting
+"clarify": "recommend genre"     # Need advice
+"chat": "how are you?"           # Conversation
 ```
 
-### Контекстный анализ в чате
+### Contextual Analysis in Chat
 
-Система анализирует историю диалога:
+System analyzes conversation history:
 
 ```python
-# Обработка согласий
-История: "assistant: Как насчет фэнтези или детективов?"
-Пользователь: "давай"
-→ Предлагает выбор между вариантами
+# Agreement handling
+History: "assistant: How about fantasy or detective?"
+User: "yes"
+→ Offers choice between options
 
-История: "assistant: Попробуй Стивена Кинга"
-Пользователь: "хорошо"
-→ Ищет книги Кинга
+History: "assistant: Try Stephen King"
+User: "okay"
+→ Searches for King's books
 
-# Направление к книгам
-После 4+ сообщений без книжных тем
-→ Мягко предлагает книги
-→ При согласии переключается на подбор
+# Book direction
+After 4+ messages without book topics
+→ Gently suggests books
+→ Switches to recommendations on agreement
 ```
 
-### Адаптивные пороги
+## 📊 Data Structure
 
-```python
-# Базовые пороги по намерениям
-SIMILARITY_THRESHOLDS = {
-    "author": 0.8,        # Высокий - точный поиск
-    "isbn": 0.9,          # Очень высокий
-    "title": 0.7,         # Высокий
-    "topic": 0.4,         # Низкий - семантика
-    "genre": 0.5,         # Средний
-    "free_text": 0.5      # Универсальный
-}
-
-# Модификаторы по языку
-LANGUAGE_THRESHOLD_MODIFIERS = {
-    "same_language": -0.1,      # Снижение для одного языка
-    "different_language": 0.0,  # Без изменений
-    "unknown_language": -0.05   # Мягкое снижение
-}
-
-# Результирующий порог = базовый + модификатор языка
-```
-
-## 🛡️ Детекция дубликатов
-
-### 4-уровневая система
-
-```python
-Level 1: Хеш файла (SHA-256)
-├─ Проверка идентичности файлов
-├─ Confidence: 1.0 при совпадении
-└─ Останов при обнаружении
-
-Level 2: ISBN проверка
-├─ Нормализация ISBN-10/13
-├─ Поиск в базе книг
-└─ Confidence: 1.0 при совпадении
-
-Level 3: Метаданные (автор + название)
-├─ Каноническая нормализация
-├─ Точное и нечеткое сравнение
-└─ Confidence: 0.9+ при высокой схожести
-
-Level 4: Схожесть контента
-├─ Хеш содержимого + семплирование
-├─ n-gram анализ (Jaccard similarity)
-└─ Confidence: 0.95+ при схожести
-```
-
-### Настройки детекции
-
-```python
-# Пороги блокировки
-confidence_threshold = 0.8   # Минимальная уверенность для блока
-force_ingest = False        # Принудительная загрузка
-
-# Стратегия остановки
-- Level 1 (файл): немедленная остановка
-- Level 2 (ISBN): остановка при confidence >= 0.9  
-- Level 3 (метаданные): остановка при confidence >= 0.9
-- Level 4 (контент): финальная проверка
-```
-
-## 📊 Структура данных
-
-### Коллекция "books" (мастер-записи)
+### "books" Collection (Master Records)
 
 ```python
 {
   "document_id": "unique-uuid",
-  "title": "Название книги", 
-  "author": "Имя Автора",
+  "title": "Book Title",
+  "author": "Author Name",
   "isbn13": "9781234567890",
   "isbn10": "1234567890", 
-  "summary": "Краткое описание...",
-  "primary_genre": "Фантастика",
-  "secondary_genres": ["Антиутопия", "Классика"],
-  "main_topics": ["Тоталитаризм", "Контроль"],
-  "mentioned_topics": ["Политика", "Общество"],
+  "summary": "Brief description...",
+  "primary_genre": "Science Fiction",
+  "secondary_genres": ["Dystopian", "Classic"],
+  "main_topics": ["Totalitarianism", "Control"],
+  "mentioned_topics": ["Politics", "Society"],
   "language": "en",
   "year": 1949,
   "is_master_chunk": true,
-  "title_canonical": "название книги",
-  "author_canonical": "имя автора",
+  "title_canonical": "book title",
+  "author_canonical": "author name",
   "file_type": "pdf"
 }
 ```
 
-### Коллекция "content" (фрагменты)
+### "content" Collection (Chunks)
 
 ```python
 {
   "document_id": "parent-book-uuid",
-  "title": "Название книги",
-  "author": "Имя Автора", 
+  "title": "Book Title",
+  "author": "Author Name",
   "language": "en",
-  "idx": 0  // индекс фрагмента
+  "idx": 0  // chunk index
 }
 ```
 
-### Формат мастер-текста
+### Master Text Format
 
-Обогащенный текст для семантического поиска:
+Enriched text for semantic search:
+
 ```
-Название книги — Полное описание — Автор: Имя Автора — Год: 1949 — Жанр: Фантастика, Антиутопия — Темы: Тоталитаризм, Контроль, Политика
+Book Title — Full description — Author: Author Name — Year: 1949 — Genre: Science Fiction, Dystopian — Topics: Totalitarianism, Control, Politics
 ```
 
-## ⚙️ Конфигурация
+## ⚙️ Configuration
 
-### Параметры поиска (settings.py)
+### Search Parameters (settings.py)
 
 ```python
-# Размеры фрагментов
-CHUNK_SIZE = 1200          # Размер фрагмента текста
-CHUNK_OVERLAP = 120        # Перекрытие между фрагментами  
-MAX_CHUNKS = 80           # Максимум фрагментов на книгу
+# Chunk sizes
+CHUNK_SIZE = 1200          # Text chunk size
+CHUNK_OVERLAP = 120        # Overlap between chunks
+MAX_CHUNKS = 80           # Maximum chunks per book
 
-# Параметры алгоритмов
-BM25_K = 8                # Результатов от BM25
-VEC_BOOKS_K = 8          # Результатов из книг
-VEC_CONTENT_K = 6        # Результатов из контента
-RRF_K = 60               # Reciprocal Rank Fusion
-
-# Диверсификация
-MAX_CHUNKS_PER_BOOK = 2             # Макс фрагментов на книгу
-CHUNKS_PER_BOOK_IN_CONTENT = 2      # Фрагментов на книгу в контенте
-CONTENT_SEARCH_EXPAND_K = 20        # Расширенный поиск для отбора
-
-# Фильтрация
-MIN_SIMILARITY_THRESHOLD = 0.6      # Устаревший глобальный порог
+# Algorithm parameters
+VEC_BOOKS_K = 8          # Results from books
+VEC_CONTENT_K = 6        # Results from content
+MAX_CHUNKS_PER_BOOK = 2             # Max chunks per book
+CHUNKS_PER_BOOK_IN_CONTENT = 2      # Chunks per book in content
+CONTENT_SEARCH_EXPAND_K = 20        # Expanded search for selection
 ```
 
-### Динамические настройки через ENV
+### Environment Variables
 
-```bash
-# JSON конфигурации - позволяют гибкую настройку без перезапуска
-SIMILARITY_THRESHOLDS='{"author": 0.8, "title": 0.7, "topic": 0.4}'
-BM25_THRESHOLDS='{"isbn": 0.05, "author": 0.1, "topic": 0.6}'
-LANGUAGE_THRESHOLD_MODIFIERS='{"same_language": -0.1, "different_language": 0.0}'
-```
+| Variable             | Description        | Default                  |
+| -------------------- | ------------------ | ------------------------ |
+| `OPENAI_API_KEY`     | OpenAI API key     | **required**             |
+| `OPENAI_MODEL_CHAT`  | Chat model         | `gpt-4o-mini`            |
+| `OPENAI_MODEL_EMBED` | Embedding model    | `text-embedding-3-small` |
+| `CHROMA_DIR`         | ChromaDB folder    | `.chroma`                |
+| `HOST`               | Server host        | `127.0.0.1`              |
+| `PORT`               | Server port        | `8000`                   |
+| `LANGSMITH_TRACING`  | LangSmith tracing  | `false`                  |
+| `LANGSMITH_PROJECT`  | LangSmith project  | -                        |
+| `LANGSMITH_API_KEY`  | LangSmith key      | -                        |
+| `LANGSMITH_ENDPOINT` | LangSmith endpoint | -                        |
 
-### Переменные окружения
+## 🎨 User Interface
 
-| Переменная | Описание | По умолчанию |
-|------------|----------|--------------|
-| `OPENAI_API_KEY` | Ключ OpenAI API | **обязательно** |
-| `OPENAI_MODEL_CHAT` | Чат модель | `gpt-4o-mini` |
-| `OPENAI_MODEL_EMBED` | Embedding модель | `text-embedding-3-small` |
-| `CHROMA_DIR` | Папка ChromaDB | `.chroma` |
-| `HOST` | Хост сервера | `127.0.0.1` |
-| `PORT` | Порт сервера | `8000` |
-| `LANGSMITH_TRACING` | Трассировка LangSmith | `false` |
-| `LANGSMITH_PROJECT` | Проект LangSmith | - |
-| `LANGSMITH_API_KEY` | Ключ LangSmith | - |
-| `LANGSMITH_ENDPOINT` | Эндпоинт LangSmith | - |
+### Main Components
 
-## 🎨 Пользовательский интерфейс
+#### 1. Main Search (`index.html`)
 
-### Основные компоненты
+- Search form with autofocus
+- Results with detailed information
+- File upload form with settings
+- Vector database collection view
 
-#### 1. Основной поиск (`index.html`)
-- Форма поиска с автофокусом
-- Результаты с детальной информацией
-- Форма загрузки файлов с настройками
-- Просмотр коллекций векторной базы
+#### 2. Chat Interface (`chat_agent.html`)
 
-#### 2. Чат-интерфейс (`chat_test.html`) 
-- WebSocket подключение
-- История сообщений с прокруткой
-- Умные чипсы-кнопки для действий
-- Индикация состояния соединения
-- Отладочная информация
+- WebSocket connection
+- Message history with scrolling
+- Smart chip buttons for actions
+- Connection status indication
+- Debug information
 
-### Интерактивные элементы
+### Interactive Elements
 
 ```javascript
-// Чипсы для быстрых действий
+// Chips for quick actions
 chips: [
-  {"text": "Детектив", "action": "search"},
-  {"text": "Фэнтези", "action": "search"},
-  {"text": "Поговорим о другом", "action": "chat"}
-]
+  { text: "Detective", action: "search" },
+  { text: "Fantasy", action: "search" },
+  { text: "Let's talk about something else", action: "chat" },
+];
 
-// Типы действий
-action: "search" // Поиск книг
-action: "chat"   // Продолжение диалога
+// Action types
+action: "search"; // Book search
+action: "chat"; // Continue conversation
 ```
 
 ## 🔧 API Reference
 
-### Основные эндпоинты
+### Main Endpoints
 
-#### `GET /` - Главная страница
-Возвращает HTML интерфейс для поиска
+#### `GET /` - Main Page
 
-#### `GET /chat_test` - Тестовый чат
-Возвращает HTML интерфейс чата с WebSocket
+Returns HTML interface for search
 
-#### `GET /health` - Проверка здоровья
+#### `GET /chat_agent` - Chat Interface
+
+Returns HTML chat interface with WebSocket
+
+#### `GET /simple_chat` - Simple Chat Test
+
+Returns simple HTML chat test interface
+
+#### `GET /health` - Health Check
+
 ```json
-{"ok": true}
+{ "ok": true }
 ```
 
-#### `POST /chat` - Поиск книг
-Основной эндпоинт для поиска через REST API
+#### `POST /chat` - Book Search
 
-Запрос:
+Main endpoint for search via REST API
+
+Request:
+
 ```json
 {
   "session_id": "string",
@@ -509,7 +453,8 @@ action: "chat"   // Продолжение диалога
 }
 ```
 
-Ответ:
+Response:
+
 ```json
 {
   "session_id": "string",
@@ -522,7 +467,7 @@ action: "chat"   // Продолжение диалога
       "author": "string", 
       "isbn13": "string",
       "summary": "string",
-      "message": "string",  // Форматированный ответ
+      "message": "string", // Formatted response
       "intent": "string"
     }
   ],
@@ -531,17 +476,20 @@ action: "chat"   // Продолжение диалога
 }
 ```
 
-#### `POST /ingest` - Загрузка документов
-Загрузка книг с автоматической обработкой
+#### `POST /ingest` - Document Upload
 
-Параметры (multipart/form-data):
-- `file`: PDF/DOCX/TXT файл
-- `meta`: JSON с метаданными (опционально)
-- `prefer_llm`: "true"/"false" - использовать LLM для анализа
-- `max_chunks`: число - максимум фрагментов
-- `force_ingest`: "true"/"false" - принудительная загрузка
+Book upload with automatic processing
 
-Успешный ответ:
+Parameters (multipart/form-data):
+
+- `file`: PDF/DOCX/TXT file
+- `meta`: JSON with metadata (optional)
+- `prefer_llm`: "true"/"false" - use LLM for analysis
+- `max_chunks`: number - maximum chunks
+- `force_ingest`: "true"/"false" - forced upload
+
+Success response:
+
 ```json
 {
   "status": "success",
@@ -552,7 +500,7 @@ action: "chat"   // Продолжение диалога
   "metadata": {
     "title": "string",
     "author": "string",
-    "language": "ru", 
+    "language": "en",
     "primary_genre": "string",
     "isbn13": "string"
   },
@@ -560,7 +508,8 @@ action: "chat"   // Продолжение диалога
 }
 ```
 
-Дублирование:
+Duplicate detection:
+
 ```json
 {
   "status": "duplicate_detected",
@@ -579,9 +528,10 @@ action: "chat"   // Продолжение диалога
 }
 ```
 
-#### `WebSocket /ws/chat_test` - Чат в реальном времени
+#### `WebSocket /ws/chat_agent` - Real-time Chat
 
-Сообщение от клиента:
+Client message:
+
 ```json
 {
   "session_id": "string",
@@ -589,236 +539,235 @@ action: "chat"   // Продолжение диалога
 }
 ```
 
-Ответ сервера:
+Server response:
+
 ```json
 {
-  "reply": "string",           // Ответ бота
-  "cards": [],                 // Карточки (будущая функция)
-  "chips": [                   // Предлагаемые действия
+  "reply": "string", // Bot response
+  "cards": [], // Cards (future feature)
+  "chips": [
+    // Suggested actions
     {
       "text": "string", 
       "action": "search|chat"
     }
   ],
-  "intent": "search|chat",     // Тип обработки
-  "debug": {                   // Отладочная информация
+  "intent": "search|chat", // Processing type
+  "debug": {
+    // Debug information
     "intent": "string",
-    "mode": "chat_test",
+    "mode": "chat_agent",
     "processing_time": "string"
   }
 }
 ```
 
-### Коллекции векторной базы
+### Vector Database Collections
 
-#### `GET /vector-store/collection/{name}` - Обзор коллекции
-Параметры:
+#### `GET /vector-store/collection/{name}` - Collection Overview
+
+Parameters:
+
 - `name`: "books" | "content"
-- `limit`: число результатов (1-200, по умолчанию 3)
+- `limit`: number of results (1-200, default 3)
 
-#### `GET /vector-store/collection/{name}/chunks` - Фрагменты документа  
-Параметры:
-- `name`: имя коллекции
-- `document_id`: ID документа (опционально)
-- `offset`: смещение (по умолчанию 0)
-- `limit`: лимит (1-200, по умолчанию 50)
+#### `GET /vector-store/collection/{name}/chunks` - Document Chunks
 
-#### `GET /vector-store/collection/{name}/search` - Поиск в коллекции
-Параметры:
-- `name`: имя коллекции 
-- `q`: поисковый запрос
-- `k`: количество результатов (1-50, по умолчанию 5)
+Parameters:
 
-#### `GET /vector-store/chunk/{name}/{chunk_id}` - Конкретный фрагмент
-Возвращает полную информацию о фрагменте
+- `name`: collection name
+- `document_id`: document ID (optional)
+- `offset`: offset (default 0)
+- `limit`: limit (1-200, default 50)
 
-## 🚀 Производительность и оптимизации
+#### `GET /vector-store/collection/{name}/search` - Collection Search
 
-### Алгоритмические оптимизации
+Parameters:
+
+- `name`: collection name
+- `q`: search query
+- `k`: number of results (1-50, default 5)
+
+#### `GET /vector-store/chunk/{name}/{chunk_id}` - Specific Chunk
+
+Returns complete chunk information
+
+## 🚀 Performance and Optimizations
+
+### Algorithmic Optimizations
 
 ```python
-# 1. Условный векторный поиск
-# Пропуск векторного поиска когда BM25 дал хорошие результаты
-if intent in ["isbn", "author"] and high_quality_bm25_matches > 0:
-    skip_vector_search = True
+# 1. Async vector search
+# Parallel queries to books and content collections
+books_task = asyncio.create_task(search_books())
+content_task = asyncio.create_task(search_content())
+results = await asyncio.gather(books_task, content_task)
 
-# 2. Исключение дубликатов в векторном поиске  
-# BM25 результаты исключаются из векторного поиска
-for doc, score in vector_results:
-    if doc.document_id not in bm25_found_ids:
-        keep_result(doc, score)
-
-# 3. Диверсификация контента
-# Ограничение фрагментов на книгу для разнообразия
+# 2. Content diversification
+# Limit chunks per book for variety
 for book_id, chunks in grouped_chunks.items():
     best_chunks = sorted(chunks, key=score)[:CHUNKS_PER_BOOK_IN_CONTENT]
 
-# 4. Умная дедупликация
-# Объединение мастер-записи с лучшим фрагментом
-merged_doc.page_content = master.content + "\n\n" + best_chunk.content
+# 3. Smart merging
+# Combine master record with best chunk
+merged_doc.content = master.content + "\n\n" + best_chunk.content
 ```
 
-### Кэширование и переиспользование
+### Caching and Reuse
 
-- **Embedding переиспользование** - векторный поиск использует уже вычисленные эмбеддинги
-- **BM25 построение** - единоразовое построение индекса при запуске  
-- **Персистентная база** - ChromaDB сохраняет данные между перезапусками
-- **Хеш-хранилище** - быстрая проверка дубликатов файлов
+- **Embedding Reuse** - vector search uses pre-computed embeddings
+- **Persistent Database** - ChromaDB saves data between restarts
+- **Hash Storage** - fast file duplicate checking
 
-### Масштабирование
+### Scaling
 
-- **Асинхронная загрузка** - `asyncio.to_thread` для блокирующих операций
-- **WebSocket pool** - поддержка множественных чат-сессий
-- **Модульная архитектура** - легкое расширение компонентов
-- **Конфигурируемые лимиты** - настройка под объем данных
+- **Async Loading** - `asyncio.to_thread` for blocking operations
+- **WebSocket Pool** - support for multiple chat sessions
+- **Modular Architecture** - easy component extension
+- **Configurable Limits** - tune for data volume
 
-## 🔒 Безопасность
+## 🔒 Security
 
-### Валидация данных
-- **Pydantic модели** - строгая типизация API
-- **Размер файлов** - ограничения на загрузку 
-- **Форматы файлов** - поддержка только разрешенных типов
-- **SQL injection** - параметризованные запросы к ChromaDB
+### Data Validation
 
-### Детекция аномалий
-- **Дублирование** - предотвращение спам-загрузок
-- **Пустые файлы** - проверка содержимого
-- **Некорректные ISBN** - валидация через isbnlib
-- **Подозрительные запросы** - логирование и мониторинг
+- **Pydantic Models** - strict API typing
+- **File Size Limits** - upload restrictions
+- **File Formats** - only allowed types supported
+- **SQL Injection** - parameterized ChromaDB queries
 
-### Логирование и аудит
+### Anomaly Detection
+
+- **Duplication** - prevent spam uploads
+- **Empty Files** - content verification
+- **Invalid ISBN** - validation via isbnlib
+- **Suspicious Requests** - logging and monitoring
+
+### Logging and Audit
+
 ```python
-# Детальное логирование всех операций
-logger.info("🔍 [retrievers.py] Starting hybrid search...")
+# Detailed logging of all operations
+logger.info("🔍 [retrievers.py] Starting vector search...")
 logger.warning("🚨 DUPLICATE DETECTED: ISBN already exists")
 logger.error("❌ [main.py] Chat request failed")
 
-# Трассировка через LangSmith
-LANGSMITH_TRACING=true  # Отслеживание LLM вызовов
+# Tracing via LangSmith
+LANGSMITH_TRACING=true  # Track LLM calls
 ```
 
-## 🧪 Разработка и отладка
+## 🧪 Development and Debugging
 
-### Структура логов
+### Log Structure
 
 ```
-🔥 CHAT REQUEST STARTED          # Начало обработки
-🧠 node_detect_intent            # Определение намерения  
-🔍 node_route_search             # Поиск документов
-💬 node_answer                   # Формирование ответа
-🎉 CHAT REQUEST COMPLETED        # Завершение
+🔥 CHAT REQUEST STARTED          # Request processing start
+🧠 node_detect_intent            # Intent detection
+🔍 node_route_search             # Document search
+💬 node_answer                   # Response formation
+🎉 CHAT REQUEST COMPLETED        # Completion
 ```
 
-### Уровни детализации
+### Detail Levels
 
 ```python
-# Логирование поискового пайплайна
-🎯 OptimizedThresholdRetriever   # Основной алгоритм
-  🔤 Step 1: BM25 search         # BM25 поиск
-  📊 Step 2: Vector search       # Векторный поиск  
-  🔍 Step 3: Content search      # Поиск в контенте
-  🧹 Smart deduplication         # Дедупликация
+# Search pipeline logging
+🎯 SimpleVectorRetriever         # Main algorithm
+  🔤 Step 1: Books search        # Books collection search
+  📊 Step 2: Content search      # Content collection search
+  🧹 Smart merging              # Result merging
 
-# Детекция дубликатов
-🔍 Level 1: File hash check      # Проверка хеша
-🔍 Level 2: ISBN check           # Проверка ISBN
-🔍 Level 3: Metadata check       # Проверка метаданных
-🔍 Level 4: Content similarity   # Проверка содержимого
+# Duplicate detection
+🔍 Level 1: File hash check      # Hash verification
+🔍 Level 2: ISBN check           # ISBN verification
+🔍 Level 3: Metadata check       # Metadata verification
+🔍 Level 4: Content similarity   # Content verification
 ```
 
-### Отладочные эндпоинты
+### Debug Endpoints
 
 ```bash
-# Статус коллекций
+# Collection status
 GET /vector-store/collection/books
 GET /vector-store/collection/content
 
-# Поиск по коллекциям
+# Collection search
 GET /vector-store/collection/books/search?q=test&k=5
 
-# Отдельные документы
+# Individual documents
 GET /vector-store/chunk/books/book-id-123
 ```
 
-### Настройка отладки
+### Debug Configuration
 
 ```env
-# Включение детального логирования
+# Enable detailed logging
 LANGSMITH_TRACING=true
 LANGSMITH_PROJECT=bookbot_debug
-
-# Снижение порогов для тестирования  
-SIMILARITY_THRESHOLDS='{"free_text": 0.3}'
-BM25_THRESHOLDS='{"free_text": 0.2}'
 ```
 
-## 🤝 Расширение системы
+## 🤝 System Extension
 
-### Добавление новых форматов файлов
+### Adding New File Formats
 
 ```python
-# В loaders.py
+# In loaders.py
 def load_text_from_file(path: str) -> Tuple[str, str]:
     ext = os.path.splitext(path)[1].lower()
     
-    # Добавить новый формат
+    # Add new format
     if ext == ".epub":
         return load_epub(path), "epub"
     
-    # Существующие форматы
+    # Existing formats
     if ext in (".txt", ".md", ".json"):
         with open(path, "r", encoding="utf-8") as f:
             return f.read(), ext.lstrip(".")
 ```
 
-### Новые алгоритмы поиска
+### New Search Algorithms
 
 ```python
-# В retrievers.py
-class CustomRetriever(BaseRetriever):
-    def _get_relevant_documents(self, query: str) -> List[Document]:
-        # Кастомная логика поиска
+# In simple_retriever.py
+class CustomRetriever:
+    async def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
+        # Custom search logic
         return documents
-
-def custom_hybrid_search(intent: str = "free_text"):
-    return CustomRetriever()
 ```
 
-### Дополнительные детекторы дубликатов
+### Additional Duplicate Detectors
 
 ```python
-# В duplicate_detection.py
+# In duplicate_detection.py
 def level5_semantic_similarity(text: str) -> DuplicateDetectionResult:
-    """Level 5: Семантическая схожесть через эмбеддинги"""
-    # Векторное сравнение содержимого
+    """Level 5: Semantic similarity via embeddings"""
+    # Vector content comparison
     return DuplicateDetectionResult(...)
 
-# Обновить основную функцию
+# Update main function
 def detect_duplicates(...):
-    # Существующие уровни 1-4
+    # Existing levels 1-4
     result5 = level5_semantic_similarity(full_text) 
     results.append(result5)
 ```
 
-### Кастомные намерения
+### Custom Intents
 
 ```python
-# В orchestrator.py или orchestrator_with_chat.py
+# In simple_orchestrator.py
 INTENT_SYS = """
-Добавить новые намерения:
-- series: поиск серий книг
-- publisher: поиск по издательству  
-- year_range: поиск по годам
+Add new intents:
+- series: search for book series
+- publisher: search by publisher
+- year_range: search by years
 """
 
-# В node_route_search добавить обработку
+# Add processing in search_step
 if state.intent == "series":
-    # Логика поиска серий
+    # Series search logic
 ```
 
-## 📈 Мониторинг и метрики
+## 📈 Monitoring and Metrics
 
-### LangSmith интеграция
+### LangSmith Integration
 
 ```env
 LANGSMITH_TRACING=true
@@ -827,101 +776,105 @@ LANGSMITH_API_KEY=your_key
 LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 ```
 
-Отслеживаемые метрики:
-- Время выполнения LLM вызовов
-- Токены использованные для анализа
-- Успешность определения намерений
-- Качество поисковых результатов
+Tracked metrics:
 
-### Логи производительности
+- LLM call execution time
+- Tokens used for analysis
+- Intent detection success rate
+- Search result quality
+
+### Performance Logs
 
 ```python
-# Время выполнения этапов
-logger.info("🔍 BM25 search completed in 0.15s")
-logger.info("📊 Vector search completed in 0.32s")  
-logger.info("🧹 Deduplication completed in 0.08s")
-logger.info("🎯 Total search time: 0.55s")
+# Step execution time
+logger.info("🔍 Vector search completed in 0.32s")
+logger.info("🧹 Merging completed in 0.08s")
+logger.info("🎯 Total search time: 0.40s")
 
-# Статистика результатов
-logger.info("📊 BM25 found: 12 → passed threshold: 3")
-logger.info("📚 Vector found: 24 → excluded: 2 → kept: 22 → passed: 7")
-logger.info("🎯 FINAL RESULTS: 8 documents after deduplication")
+# Result statistics
+logger.info("📊 Books found: 12 → filtered: 3")
+logger.info("📚 Content found: 24 → kept: 7")
+logger.info("🎯 FINAL RESULTS: 8 documents after merging")
 ```
 
-### Основные KPI
+### Key KPIs
 
-- **Точность поиска** - релевантность результатов запросу
-- **Время отклика** - скорость обработки запросов
-- **Покрытие коллекции** - процент находимых книг
-- **Дублирование** - эффективность детекции
-- **Использование ресурсов** - потребление OpenAI API
+- **Search Accuracy** - result relevance to query
+- **Response Time** - request processing speed
+- **Collection Coverage** - percentage of findable books
+- **Duplication Rate** - duplicate detection effectiveness
+- **Resource Usage** - OpenAI API consumption
 
-## ❓ Устранение проблем
+## ❓ Troubleshooting
 
-### Частые проблемы
+### Common Issues
 
-#### 1. Нет результатов поиска
+#### 1. No Search Results
+
 ```bash
-# Проверка коллекций
+# Check collections
 GET /vector-store/collection/books
 
-# Снижение порогов
+# Lower thresholds
 SIMILARITY_THRESHOLDS='{"free_text": 0.2}'
 ```
 
-#### 2. Медленная работа
-```python
-# Проверка размера коллекции
-collection.count()  # Если > 10000 - оптимизировать
+#### 2. Slow Performance
 
-# Уменьшение параметров поиска
+```python
+# Check collection size
+collection.count()  # If > 10000 - optimize
+
+# Reduce search parameters
 VEC_BOOKS_K = 5
 CONTENT_SEARCH_EXPAND_K = 10
 ```
 
-#### 3. Проблемы с загрузкой
+#### 3. Upload Issues
+
 ```python
-# Принудительная загрузка
+# Forced upload
 force_ingest = True
 
-# Отладка детекции дубликатов
+# Debug duplicate detection
 logger.info("Duplicate checks: %s", duplicate_results)
 ```
 
-#### 4. WebSocket отключения
+#### 4. WebSocket Disconnections
+
 ```javascript
-// Переподключение
-ws.onclose = function() {
+// Reconnection
+ws.onclose = function () {
     setTimeout(connectWebSocket, 1000);
 };
 ```
 
-### Диагностические команды
+### Diagnostic Commands
 
 ```bash
-# Проверка здоровья
+# Health check
 curl http://localhost:8000/health
 
-# Тестовый поиск
+# Test search
 curl -X POST "http://localhost:8000/chat" \
   -H "Content-Type: application/json" \
-  -d '{"session_id":"test","message":"тест"}'
+  -d '{"session_id":"test","message":"test"}'
 
-# Статус коллекций
+# Collection status
 curl "http://localhost:8000/vector-store/collection/books?limit=1"
 ```
 
-## 📄 Лицензия
+## 📄 License
 
-MIT License - свободное использование и модификация.
+MIT License - free use and modification.
 
-## 🆘 Поддержка
+## 🆘 Support
 
-1. **Проверьте конфигурацию** - `.env` файл и ключи API
-2. **Изучите логи** - детальное логирование всех операций  
-3. **Тестируйте компоненты** - используйте диагностические эндпоинты
-4. **Создайте Issue** - для сообщения о багах и предложений
+1. **Check Configuration** - `.env` file and API keys
+2. **Review Logs** - detailed logging of all operations
+3. **Test Components** - use diagnostic endpoints
+4. **Create Issue** - for bug reports and suggestions
 
 ---
 
-**BookBot Full** - современная AI-система для интеллектуального поиска книг с продвинутыми возможностями чата и гибридными алгоритмами! 📚✨🤖
+**BookBot** - modern AI system for intelligent book search with advanced chat capabilities! 📚✨🤖

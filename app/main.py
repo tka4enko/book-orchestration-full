@@ -78,13 +78,13 @@ def chat_test():
 
 @app.get("/simple-chat", response_class=HTMLResponse)
 def simple_chat_page():
-    """Веб-интерфейс для тестирования простого поиска"""
+    """Web interface for testing simple search"""
     with open(os.path.join(os.path.dirname(__file__), "static", "simple_chat.html"), "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 @app.get("/chat_agent", response_class=HTMLResponse)
 def chat_agent_page():
-    """Веб-интерфейс для тестирования chat-agent"""
+    """Web interface for testing chat-agent"""
     with open(os.path.join(os.path.dirname(__file__), "static", "chat_agent.html"), "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
@@ -167,7 +167,7 @@ def chat(body: ChatIn):
 
 @app.post("/simple_chat")
 async def simple_chat(body: ChatIn):
-    """Простой поиск с LLM фильтром - альтернативная реализация без BM25"""
+    """Simple search with LLM filter - alternative implementation without BM25"""
     import time
     start_time = time.time()
     
@@ -178,10 +178,10 @@ async def simple_chat(body: ChatIn):
     logger.info("=" * 80)
     
     try:
-        # Используем новый простой orchestrator
+        # Use new simple orchestrator
         result = await process_simple_search(body.session_id, body.message)
         
-        # Добавляем общее время выполнения
+        # Add total execution time
         total_time = time.time() - start_time
         result["total_execution_time_seconds"] = total_time
         
@@ -198,7 +198,7 @@ async def simple_chat(body: ChatIn):
         logger.error("=" * 80)
         return JSONResponse({
             "error": f"Simple chat failed: {e}",
-            "response": "Извините, произошла ошибка при обработке запроса.",
+            "response": "Sorry, an error occurred while processing the request.",
             "results": [],
             "intent": "error",
             "total_execution_time_seconds": time.time() - start_time
@@ -370,12 +370,12 @@ def search_collection(name: str, q: str = Query(..., min_length=1), k: int = Que
     results = [{"content_preview": (d.page_content or "")[:200], "content_length": len(d.page_content or ""), "metadata": d.metadata} for d in docs]
     return JSONResponse({"collection_name": name, "k": k, "query": q, "results": results})
 
-# Хранилище истории чата для сессий
+# Chat history storage for sessions
 chat_histories = {}
 
 @app.websocket("/ws/chat_agent")
 async def chat_agent_websocket(websocket: WebSocket):
-    """Новый WebSocket endpoint для chat-agent"""
+    """New WebSocket endpoint for chat-agent"""
     await websocket.accept()
     
     try:
@@ -386,36 +386,36 @@ async def chat_agent_websocket(websocket: WebSocket):
             
             logger.info(f"🤖 [ChatAgent] Message from {session_id}: '{user_message}'")
             
-            # Получаем историю для сессии
+            # Get history for session
             chat_history = chat_histories.get(session_id, [])
             
-            # Используем новый chat-agent orchestrator
+            # Use new chat-agent orchestrator
             state = ChatAgentState(
                 session_id=session_id, 
                 message=user_message, 
                 chat_history=chat_history
             )
-            # Используем thread_id для сохранения состояния между сообщениями
+            # Use thread_id to preserve state between messages
             config = {"configurable": {"thread_id": session_id}}
             result = await chat_agent_graph.ainvoke(state, config=config)
             
-            # Форматируем ответ
+            # Format response
             if hasattr(result, "model_dump"):
                 response_data = result.model_dump()
             else:
                 response_data = result
             
-            # Обновляем историю чата
+            # Update chat history
             if hasattr(result, "chat_history"):
                 chat_histories[session_id] = result.chat_history
             elif "chat_history" in response_data:
                 chat_histories[session_id] = response_data["chat_history"]
             
-            # Создаем ответ для фронтенда
+            # Create response for frontend
             results = response_data.get("results", [{}])
             first_result = results[0] if results else {}
             
-            # Определяем режим работы на основе типа результата
+            # Determine operation mode based on result type
             result_intent = first_result.get("intent", "chat")
             mode_type = "unknown"
             if first_result.get("chat_mode"):
@@ -427,13 +427,13 @@ async def chat_agent_websocket(websocket: WebSocket):
             elif first_result.get("clarify_mode"):
                 mode_type = "clarify"
             
-            # Получаем метрики производительности
+            # Get performance metrics
             performance_metrics = response_data.get("performance_metrics", {})
             total_time = performance_metrics.get("total_time", 0)
             
             response = {
                 "reply": first_result.get("message", ""),
-                "cards": [],  # Для будущего расширения
+                "cards": [],  # For future expansion
                 "chips": first_result.get("chips", []),
                 "intent": result_intent,
                 "debug": {
@@ -462,29 +462,29 @@ async def chat_test_websocket(websocket: WebSocket):
             
             logger.info(f"🧪 [ChatTest] Message from {session_id}: '{user_message}'")
             
-            # Получаем историю для сессии
+            # Get history for session
             chat_history = chat_histories.get(session_id, [])
             
-            # Используем новый orchestrator с чатом
+            # Use new orchestrator with chat
             state = ChatStateWithChat(session_id=session_id, message=user_message, chat_history=chat_history)
             result = graph_with_chat.invoke(state)
             
-            # Форматируем ответ
+            # Format response
             if hasattr(result, "model_dump"):
                 response_data = result.model_dump()
             else:
                 response_data = result
             
-            # Обновляем историю чата
+            # Update chat history
             if hasattr(result, "chat_history"):
                 chat_histories[session_id] = result.chat_history
             elif "chat_history" in response_data:
                 chat_histories[session_id] = response_data["chat_history"]
             
-            # Создаем ответ для фронтенда
+            # Create response for frontend
             response = {
                 "reply": response_data.get("results", [{}])[0].get("message", ""),
-                "cards": [],  # Будем добавлять позже
+                "cards": [],  # Will add later
                 "chips": response_data.get("results", [{}])[0].get("chips", []),
                 "intent": response_data.get("intent", "chat"),
                 "debug": {

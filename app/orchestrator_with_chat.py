@@ -22,7 +22,7 @@ class ChatStateWithChat(BaseModel):
     need_clarify: bool = False
     clarify_question: Optional[str] = None
     
-    # Новые поля для чата
+    # New fields for chat
     chat_history: List[Dict[str, Any]] = Field(default_factory=list)
     is_chat_mode: bool = False
     reply_message: Optional[str] = None
@@ -31,42 +31,42 @@ class ChatStateWithChat(BaseModel):
 llm = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0, api_key=OPENAI_API_KEY)
 chat_llm = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0.7, api_key=OPENAI_API_KEY)
 
-# Промпт для чата
-CHAT_SYS = """Ты - BookBot, помощник по поиску книг.
+# Chat prompt
+CHAT_SYS = """You are BookBot, a book search assistant.
 
-ГЛАВНАЯ ЦЕЛЬ: Направлять пользователя к поиску и рекомендациям книг!
+MAIN GOAL: Guide users to book search and recommendations!
 
-Правила:
-- Отвечай ОЧЕНЬ кратко (1-2 предложения максимум)
-- Не поддерживай долгие беседы о других темах  
-- ВСЕГДА активно направляй к книгам после короткого ответа
-- Связывай любую тему с книгами где возможно
-- После 2-3 обменов сообщениями - настойчиво предлагай книги
+Rules:
+- Answer VERY briefly (1-2 sentences maximum)
+- Don't engage in long conversations about other topics  
+- ALWAYS actively direct to books after a short answer
+- Connect any topic to books where possible
+- After 2-3 message exchanges - persistently suggest books
 
-Примеры связи тем с книгами:
-- Видеоигры → "Есть отличные книги по игровой индустрии!"  
-- Футбол → "Могу найти книги о футболе или спорте!"
-- Работа тяжелая → "Книги помогают расслабиться после работы!"
+Examples of connecting topics to books:
+- Video games → "There are great books about the gaming industry!"  
+- Football → "I can find books about football or sports!"
+- Work is hard → "Books help relax after work!"
 
-История: {chat_history}
-Сообщение: {message}
+History: {chat_history}
+Message: {message}
 
-Верни JSON:
+Return JSON:
 {{
-    "reply": "короткий ответ + направление к книгам",
+    "reply": "short answer + direction to books",
     "chips": [
-        {{"text": "Посоветуй что почитать", "action": "chat"}},
-        {{"text": "Найти книги по теме", "action": "search"}}
+        {{"text": "Recommend what to read", "action": "chat"}},
+        {{"text": "Find books by topic", "action": "search"}}
     ]
 }}"""
 
 def _format_chat_history(history: List[Dict[str, Any]]) -> str:
-    """Форматирует историю чата"""
+    """Formats chat history"""
     if not history:
         return ""
     
     formatted = []
-    for entry in history[-5:]:  # Последние 5 сообщений
+    for entry in history[-5:]:  # Last 5 messages
         role = entry.get("role", "user")
         content = entry.get("content", "")
         formatted.append(f"{role}: {content}")
@@ -74,7 +74,7 @@ def _format_chat_history(history: List[Dict[str, Any]]) -> str:
     return "\n".join(formatted)
 
 def _is_agreement_message(message: str) -> bool:
-    """Проверяет является ли сообщение согласием"""
+    """Checks if message is an agreement"""
     import re
     agreement_patterns = [
         r'^да$', r'^давай$', r'^хорошо$', r'^ок$', r'^okay$', r'^конечно$',
@@ -89,7 +89,7 @@ def _is_agreement_message(message: str) -> bool:
     return False
 
 def _docs_to_payload(docs):
-    """Конвертирует документы в формат ответа"""
+    """Converts documents to response format"""
     out = []
     for d in docs:
         m = d.metadata or {}
@@ -188,14 +188,14 @@ def node_detect_intent(state: ChatStateWithChat) -> ChatStateWithChat:
     Return JSON: {"intent":"...", "filters":{...}}
     Extract exact values from context when user agrees."""
     
-    # Проверяем на согласие для специальной обработки
+    # Check for agreement for special processing
     is_agreement = _is_agreement_message(state.message)
     if is_agreement:
         logger.info("🤝 Agreement detected - using enhanced context analysis")
     
-    # Форматируем историю для контекста
+    # Format history for context
     history_text = _format_chat_history(state.chat_history)
-    context = f"История чата:\n{history_text}\n\nТекущее сообщение: {state.message}"
+    context = f"Chat history:\n{history_text}\n\nCurrent message: {state.message}"
     
     out = llm.invoke([("system", INTENT_SYS), ("user", context)]).content
     logger.info(f"    LLM intent response: {out}")
@@ -215,7 +215,7 @@ def node_detect_intent(state: ChatStateWithChat) -> ChatStateWithChat:
     return state
 
 def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
-    """Обрабатывает обычный чат (не поиск книг)"""
+    """Handles regular chat (not book search)"""
     logger.info("�� [orchestrator_with_chat.py] node_chat - Processing chat message...")
     
     try:

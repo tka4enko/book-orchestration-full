@@ -77,8 +77,8 @@ MAX_CHUNKS_PER_BOOK = int(os.getenv("MAX_CHUNKS_PER_BOOK", "2"))
 CHUNKS_PER_BOOK_IN_CONTENT = int(os.getenv("CHUNKS_PER_BOOK_IN_CONTENT", "2"))
 CONTENT_SEARCH_EXPAND_K = int(os.getenv("CONTENT_SEARCH_EXPAND_K", "20"))
 
-# Alias extraction threshold - минимальная similarity для извлечения алиасов
+# Alias extraction threshold - minimum similarity for alias extraction
 ALIAS_EXTRACTION_THRESHOLD = float(os.getenv("ALIAS_EXTRACTION_THRESHOLD", "0.5"))
 
-# Mixed filters threshold - добавим когда найдем где используется
+# Mixed filters threshold - will add when we find where it's used
 # MIXED_FILTERS_THRESHOLD = float(os.getenv("MIXED_FILTERS_THRESHOLD", "0.4"))

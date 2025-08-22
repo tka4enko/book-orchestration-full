@@ -22,25 +22,25 @@ async def run_single_test(test_data):
         result = await process_simple_search("test_session", query)
         elapsed = time.time() - start_time
         
-        # Анализируем результат
+        # Analyze result
         found_books = result.get('results', [])
         found_any = len(found_books) > 0
         
         if expected_outcome == "success":
-            # Должна найтись нужная книга
+            # Should find the needed book
             success = False
             if expected_doc_id:
-                # Проверяем что нашли нужную книгу по ID
+                # Check that we found the right book by ID
                 for book in found_books:
                     if book.get('metadata', {}).get('document_id') == expected_doc_id:
                         success = True
                         break
             else:
-                # Просто должна была что-то найти
+                # Should just find something
                 success = found_any
                 
             status = "✅ PASS" if success else "❌ FAIL"
-            print(f"   Результат: {status} - найдено {len(found_books)} книг за {elapsed:.2f}с")
+            print(f"   Result: {status} - found {len(found_books)} books in {elapsed:.2f}s")
             
             if found_books:
                 for i, book in enumerate(found_books):
@@ -50,16 +50,16 @@ async def run_single_test(test_data):
                     print(f"   [{i+1}] {title} by {author} (score: {score:.3f})")
                     
         elif expected_outcome == "failure":
-            # Не должна была найти книгу
+            # Should not have found a book
             success = not found_any
             status = "✅ PASS" if success else "❌ FAIL"
-            print(f"   Результат: {status} - найдено {len(found_books)} книг (ожидали 0)")
+            print(f"   Result: {status} - found {len(found_books)} books (expected 0)")
             
         elif expected_outcome == "clarify":
-            # Должна найти но с пояснением о неточности
-            success = found_any  # Базовая проверка - что-то нашло
+            # Should find but with clarification about inaccuracy
+            success = found_any  # Basic check - found something
             status = "✅ PASS" if success else "❌ FAIL"
-            print(f"   Результат: {status} - найдено {len(found_books)} книг (нужно уточнение)")
+            print(f"   Result: {status} - found {len(found_books)} books (needs clarification)")
             
         return {
             'test_id': test_data['id'],
@@ -87,11 +87,11 @@ async def run_single_test(test_data):
         }
 
 async def run_realistic_tests(limit=None):
-    """Запускает realistic tests"""
-    print("🚀 Запуск Realistic Tests")
+    """Runs realistic tests"""
+    print("🚀 Running Realistic Tests")
     print("=" * 80)
     
-    # Загружаем тесты
+    # Load tests
     with open('realistic_tests.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
     
@@ -99,19 +99,19 @@ async def run_realistic_tests(limit=None):
     if limit:
         tests = tests[:limit]
     
-    print(f"📊 Всего тестов: {len(tests)}")
+    print(f"📊 Total tests: {len(tests)}")
     
-    # Статистика по категориям
+    # Statistics by categories
     categories = {}
     for test in tests:
         cat = test['category']
         categories[cat] = categories.get(cat, 0) + 1
     
-    print("📋 Категории:")
+    print("📋 Categories:")
     for cat, count in categories.items():
-        print(f"   {cat}: {count} тестов")
+        print(f"   {cat}: {count} tests")
     
-    # Запускаем тесты
+    # Run tests
     results = []
     passed = 0
     failed = 0
@@ -125,15 +125,15 @@ async def run_realistic_tests(limit=None):
         else:
             failed += 1
     
-    # Итоговый отчет
+    # Final report
     print("\n" + "=" * 80)
-    print("📊 ИТОГОВЫЕ РЕЗУЛЬТАТЫ")
-    print(f"✅ Пройдено: {passed}")
-    print(f"❌ Провалено: {failed}")
-    print(f"📈 Успешность: {passed/(passed+failed)*100:.1f}%")
+    print("📊 FINAL RESULTS")
+    print(f"✅ Passed: {passed}")
+    print(f"❌ Failed: {failed}")
+    print(f"📈 Success rate: {passed/(passed+failed)*100:.1f}%")
     
-    # Статистика по категориям
-    print("\n📋 Результаты по категориям:")
+    # Statistics by categories
+    print("\n📋 Results by categories:")
     cat_stats = {}
     for result in results:
         cat = result['category']
@@ -150,7 +150,7 @@ async def run_realistic_tests(limit=None):
         success_rate = stats['passed'] / total * 100 if total > 0 else 0
         print(f"   {cat}: {stats['passed']}/{total} ({success_rate:.1f}%)")
     
-    # Сохраняем детальные результаты
+    # Save detailed results
     with open('realistic_test_results.json', 'w', encoding='utf-8') as f:
         json.dump({
             'summary': {

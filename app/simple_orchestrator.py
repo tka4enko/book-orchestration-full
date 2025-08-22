@@ -12,50 +12,50 @@ from .simple_llm_filter import SimpleLLMFilter
 logger = logging.getLogger(__name__)
 
 class SimpleSearchState(BaseModel):
-    """Состояние для простого поиска без сложной логики"""
+    """State for simple search without complex logic"""
     session_id: str
     message: str
-    # Результаты поиска
+    # Search results
     search_results: List[Dict[str, Any]] = Field(default_factory=list)
-    # Результаты после LLM фильтрации
+    # Results after LLM filtering
     filtered_results: List[Dict[str, Any]] = Field(default_factory=list)
-    # Анализ от LLM
+    # Analysis from LLM
     intent: Optional[str] = None
     analysis: Optional[str] = None
     negative_filters: Optional[str] = None
     uncertainty_note: Optional[str] = None
-    # Финальный ответ
+    # Final response
     final_response: Optional[str] = None
-    # Метрики производительности
+    # Performance metrics
     performance_metrics: Dict[str, float] = Field(default_factory=dict)
-    # Ошибки
+    # Errors
     error: Optional[str] = None
 
-# Инициализация компонентов
+# Component initialization
 simple_retriever = SimpleVectorRetriever()
 llm_filter = SimpleLLMFilter()
 llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.3, api_key=OPENAI_API_KEY)
 
 def search_step(state: SimpleSearchState) -> SimpleSearchState:
-    """Шаг 1: Простой векторный поиск"""
-    logger.info(f"🔍 [Step 1] Простой поиск для: '{state.message}'")
+    """Step 1: Simple vector search"""
+    logger.info(f"🔍 [Step 1] Simple search for: '{state.message}'")
     
     start_time = time.time()
     
     try:
-        # Выполняем асинхронный поиск с помощью concurrent.futures
+        # Execute async search using concurrent.futures
         import concurrent.futures
         import asyncio
         
         def run_search():
-            # Создаем новый event loop в отдельном потоке
+            # Create new event loop in separate thread
             loop = asyncio.new_event_loop()
             try:
                 return loop.run_until_complete(simple_retriever.search(state.message, k=5))
             finally:
                 loop.close()
         
-        # Выполняем в отдельном потоке
+        # Execute in separate thread
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(run_search)
             search_results = future.result()
@@ -63,38 +63,38 @@ def search_step(state: SimpleSearchState) -> SimpleSearchState:
         state.search_results = search_results
         state.performance_metrics['search_time'] = time.time() - start_time
         
-        logger.info(f"✅ [Step 1] Найдено {len(search_results)} результатов за {state.performance_metrics['search_time']:.2f}с")
+        logger.info(f"✅ [Step 1] Found {len(search_results)} results in {state.performance_metrics['search_time']:.2f}s")
         
         return state
         
     except Exception as e:
-        logger.error(f"❌ [Step 1] Ошибка поиска: {e}")
-        state.error = f"Ошибка поиска: {e}"
+        logger.error(f"❌ [Step 1] Search error: {e}")
+        state.error = f"Search error: {e}"
         state.performance_metrics['search_time'] = time.time() - start_time
         return state
 
 def filter_step(state: SimpleSearchState) -> SimpleSearchState:
-    """Шаг 2: LLM фильтрация и анализ"""
-    logger.info(f"🧠 [Step 2] LLM фильтрация {len(state.search_results)} результатов")
+    """Step 2: LLM filtering and analysis"""
+    logger.info(f"🧠 [Step 2] LLM filtering {len(state.search_results)} results")
     
     start_time = time.time()
     
     try:
-        # Если есть ошибка на предыдущем шаге, пропускаем
+        # If there's an error on previous step, skip
         if state.error:
-            logger.warning("⚠️ [Step 2] Пропускаем из-за ошибки на предыдущем шаге")
+            logger.warning("⚠️ [Step 2] Skipping due to error on previous step")
             return state
             
-        # Если нет результатов поиска, пропускаем фильтрацию
+        # If no search results, skip filtering
         if not state.search_results:
-            logger.info("ℹ️ [Step 2] Нет результатов для фильтрации")
+            logger.info("ℹ️ [Step 2] No results to filter")
             state.filtered_results = []
             state.intent = "no_results"
-            state.analysis = "Результаты поиска не найдены"
+            state.analysis = "Search results not found"
             state.performance_metrics['filter_time'] = time.time() - start_time
             return state
         
-        # Выполняем LLM фильтрацию
+        # Execute LLM filtering
         import concurrent.futures
         import asyncio
         
@@ -105,15 +105,15 @@ def filter_step(state: SimpleSearchState) -> SimpleSearchState:
             finally:
                 loop.close()
         
-        # Выполняем в отдельном потоке
+        # Execute in separate thread
         llm_filter_start = time.time()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(run_filter)
             filter_result = future.result()
         llm_filter_time = time.time() - llm_filter_start
-        logger.info(f"⚡ LLM filter за {llm_filter_time:.3f}с")
+        logger.info(f"⚡ LLM filter in {llm_filter_time:.3f}s")
         
-        # Обновляем состояние
+        # Update state
         state.filtered_results = filter_result['filtered_results']
         state.intent = filter_result['intent']
         state.analysis = filter_result['analysis']
@@ -121,40 +121,40 @@ def filter_step(state: SimpleSearchState) -> SimpleSearchState:
         state.uncertainty_note = filter_result.get('uncertainty_note', '')
         state.performance_metrics['filter_time'] = time.time() - start_time
         
-        logger.info(f"✅ [Step 2] LLM анализ: intent='{state.intent}', "
-                   f"отфильтровано {len(state.filtered_results)}/{len(state.search_results)} за {state.performance_metrics['filter_time']:.2f}с")
+        logger.info(f"✅ [Step 2] LLM analysis: intent='{state.intent}', "
+                   f"filtered {len(state.filtered_results)}/{len(state.search_results)} in {state.performance_metrics['filter_time']:.2f}s")
         
         return state
         
     except Exception as e:
-        logger.error(f"❌ [Step 2] Ошибка LLM фильтрации: {e}")
-        # В случае ошибки возвращаем все результаты
+        logger.error(f"❌ [Step 2] LLM filtering error: {e}")
+        # In case of error return all results
         state.filtered_results = state.search_results
         state.intent = "filter_error"
-        state.analysis = f"Ошибка фильтрации: {e}"
+        state.analysis = f"Filtering error: {e}"
         state.performance_metrics['filter_time'] = time.time() - start_time
         return state
 
 def format_step(state: SimpleSearchState) -> SimpleSearchState:
-    """Шаг 3: Форматирование финального ответа"""
-    logger.info(f"💬 [Step 3] Форматирование ответа для {len(state.filtered_results)} результатов")
+    """Step 3: Format final response"""
+    logger.info(f"💬 [Step 3] Formatting response for {len(state.filtered_results)} results")
     
     start_time = time.time()
     
     try:
-        # Если есть критическая ошибка, возвращаем ошибку
+        # If there's a critical error, return error
         if state.error and not state.filtered_results:
-            state.final_response = f"Извините, произошла ошибка при поиске: {state.error}"
+            state.final_response = f"Sorry, an error occurred during search: {state.error}"
             state.performance_metrics['format_time'] = time.time() - start_time
             return state
         
-        # Если нет результатов
+        # If no results
         if not state.filtered_results:
             state.final_response = _format_no_results_response(state.message)
             state.performance_metrics['format_time'] = time.time() - start_time
             return state
         
-        # Генерируем ответ с помощью LLM
+        # Generate response using LLM
         import concurrent.futures
         import asyncio
         
@@ -171,32 +171,32 @@ def format_step(state: SimpleSearchState) -> SimpleSearchState:
             finally:
                 loop.close()
         
-        # Выполняем в отдельном потоке
+        # Execute in separate thread
         llm_format_start = time.time()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(run_format)
             formatted_response = future.result()
         llm_format_time = time.time() - llm_format_start
-        logger.info(f"⚡ LLM format за {llm_format_time:.3f}с")
+        logger.info(f"⚡ LLM format in {llm_format_time:.3f}s")
         
         state.final_response = formatted_response
         state.performance_metrics['format_time'] = time.time() - start_time
         
-        logger.info(f"✅ [Step 3] Ответ сформирован за {state.performance_metrics['format_time']:.2f}с")
+        logger.info(f"✅ [Step 3] Response formatted in {state.performance_metrics['format_time']:.2f}s")
         
         return state
         
     except Exception as e:
-        logger.error(f"❌ [Step 3] Ошибка форматирования: {e}")
-        # Fallback к простому форматированию
+        logger.error(f"❌ [Step 3] Formatting error: {e}")
+        # Fallback to simple formatting
         state.final_response = _format_simple_response(state.filtered_results)
         state.performance_metrics['format_time'] = time.time() - start_time
         return state
 
 async def _generate_formatted_response(query: str, results: List[Dict], intent: str, analysis: str, uncertainty_note: str = "") -> str:
-    """Генерирует форматированный ответ с помощью LLM"""
+    """Generates formatted response using LLM"""
     
-    # Минимальная информация для быстрого форматирования с content
+    # Minimal information for quick formatting with content
     results_info = []
     for i, result in enumerate(results, 1):
         title = result.get('title', 'Unknown')
@@ -205,13 +205,13 @@ async def _generate_formatted_response(query: str, results: List[Dict], intent: 
         
         result_text = f"""{i}. "{title}" - {author}"""
         
-        # Добавляем только год если есть
+        # Add year only if available
         metadata = result.get('metadata', {})
         year = metadata.get('year', '')
         if year:
             result_text += f" ({year})"
         
-        # Добавляем полный content 
+        # Add full content 
         if content:
             result_text += f"\n   {content}"
         
@@ -219,24 +219,24 @@ async def _generate_formatted_response(query: str, results: List[Dict], intent: 
     
     results_text = "\n\n".join(results_info)
     
-    # Краткий мотивирующий промпт для чтения
-    system_prompt = """Ты опытный библиотекарь. Создай краткий и мотивирующий ответ на русском языке.
+    # Brief motivating prompt for reading
+    system_prompt = """You are an experienced librarian. Create a brief and motivating response in English.
 
-ВАЖНО: Ответ должен быть коротким (200-300 символов)!
+IMPORTANT: Response should be short (200-300 characters)!
 
-Для каждой книги напиши:
-1. "📖 «Название» — Автор (год)"
-2. Краткое описание сюжета (1-2 предложения)
-3. Почему стоит прочесть
+For each book write:
+1. "📖 «Title» — Author (year)"
+2. Brief plot description (1-2 sentences)
+3. Why it's worth reading
 
-Будь лаконичным, но вдохновляющим!"""
+Be concise but inspiring!"""
 
-    user_prompt = f"""Пользователь ищет: "{query}"
+    user_prompt = f"""User is looking for: "{query}"
 
-Найденные книги:
+Found books:
 {results_text}
 
-Создай вдохновляющий ответ, который мотивирует к чтению!"""
+Create an inspiring response that motivates reading!"""
 
     try:
         messages = [
@@ -245,20 +245,20 @@ async def _generate_formatted_response(query: str, results: List[Dict], intent: 
         ]
         
         response = await llm.ainvoke(messages)
-        logger.info(f"📝 LLM сгенерированный ответ: {response.content[:200]}...")
+        logger.info(f"📝 LLM generated response: {response.content[:200]}...")
         return response.content
         
     except Exception as e:
-        logger.error(f"❌ Ошибка генерации ответа: {e}")
-        logger.info("🔄 Используем fallback форматирование")
+        logger.error(f"❌ Error generating response: {e}")
+        logger.info("🔄 Using fallback formatting")
         return _format_simple_response(results)
 
 def _format_simple_response(results: List[Dict]) -> str:
-    """Простое форматирование без LLM в случае ошибки"""
+    """Simple formatting without LLM in case of error"""
     if not results:
-        return "К сожалению, подходящих книг не найдено."
+        return "Unfortunately, no suitable books found."
     
-    lines = [f"Найдено {len(results)} книг(и):"]
+    lines = [f"Found {len(results)} book(s):"]
     
     for i, result in enumerate(results, 1):
         title = result.get('title', 'Unknown')
@@ -266,7 +266,7 @@ def _format_simple_response(results: List[Dict]) -> str:
         
         line = f"{i}. \"{title}\" - {author}"
         
-        # Добавляем год если есть
+        # Add year if available
         metadata = result.get('metadata', {})
         year = metadata.get('year', '')
         if year:
@@ -277,28 +277,28 @@ def _format_simple_response(results: List[Dict]) -> str:
     return "\n".join(lines)
 
 def _format_no_results_response(query: str) -> str:
-    """Форматирует ответ когда результатов нет"""
-    return f"""К сожалению, не удалось найти книги по запросу "{query}".
+    """Formats response when no results found"""
+    return f"""Unfortunately, no books found for query "{query}".
 
-Попробуйте:
-- Проверить правильность написания названия или автора
-- Использовать более общие термины
-- Попробовать поиск по жанру или теме
+Try:
+- Check spelling of title or author
+- Use more general terms
+- Try search by genre or topic
 
-Могу помочь с другим запросом!"""
+I can help with another query!"""
 
-# Создание графа
+# Graph creation
 def create_simple_search_graph():
-    """Создает граф для простого поиска"""
+    """Creates graph for simple search"""
     
     workflow = StateGraph(SimpleSearchState)
     
-    # Добавляем узлы
+    # Add nodes
     workflow.add_node("search", search_step)
     workflow.add_node("filter", filter_step) 
     workflow.add_node("format", format_step)
     
-    # Определяем поток
+    # Define flow
     workflow.set_entry_point("search")
     workflow.add_edge("search", "filter")
     workflow.add_edge("filter", "format")
@@ -306,38 +306,38 @@ def create_simple_search_graph():
     
     return workflow.compile()
 
-# Создаем граф
+# Create graph
 simple_search_graph = create_simple_search_graph()
 
 async def process_simple_search(session_id: str, message: str) -> Dict[str, Any]:
     """
-    Основная функция для обработки простого поиска
+    Main function for processing simple search
     
     Args:
-        session_id: идентификатор сессии
-        message: сообщение пользователя
+        session_id: session identifier
+        message: user message
         
     Returns:
-        Dict с результатами поиска
+        Dict with search results
     """
-    logger.info(f"🚀 [Simple Search] Начинаем обработку: session_id={session_id}, query='{message}'")
+    logger.info(f"🚀 [Simple Search] Starting processing: session_id={session_id}, query='{message}'")
     
     total_start_time = time.time()
     
     try:
-        # Создаем начальное состояние
+        # Create initial state
         initial_state = SimpleSearchState(
             session_id=session_id,
             message=message
         )
         
-        # Выполняем граф
+        # Execute graph
         final_state = simple_search_graph.invoke(initial_state)
         
-        # Общее время
+        # Total time
         total_time = time.time() - total_start_time
         
-        # Обрабатываем результат (может быть dict или объект)
+        # Process result (can be dict or object)
         if hasattr(final_state, 'performance_metrics'):
             final_state.performance_metrics['total_time'] = total_time
             performance_metrics = final_state.performance_metrics

@@ -7,47 +7,47 @@ from .settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
 logger = logging.getLogger(__name__)
 
 class SimpleLLMFilter:
-    """LLM-фильтр с системным промптом для анализа и фильтрации результатов поиска"""
+    """LLM filter with system prompt for analyzing and filtering search results"""
     
     def __init__(self):
         self.llm = ChatOpenAI(
             model="gpt-3.5-turbo",
-            temperature=0,  # Детерминированный результат
+            temperature=0,  # Deterministic result
             api_key=OPENAI_API_KEY
         )
         logger.info("🧠 SimpleLLMFilter initialized")
     
     async def filter_and_analyze(self, query: str, search_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Анализирует запрос пользователя и фильтрует результаты поиска
+        Analyzes user query and filters search results
         
         Args:
-            query: оригинальный запрос пользователя
-            search_results: результаты векторного поиска
+            query: original user query
+            search_results: vector search results
             
         Returns:
-            Dict с отфильтрованными результатами и метаданными анализа
+            Dict with filtered results and analysis metadata
         """
-        logger.info(f"🧠 LLM анализ запроса: '{query}' для {len(search_results)} результатов")
+        logger.info(f"🧠 LLM analysis of query: '{query}' for {len(search_results)} results")
         
         if not search_results:
             return {
                 "filtered_results": [],
                 "intent": "no_results",
-                "analysis": "Нет результатов для анализа",
+                "analysis": "No results to analyze",
                 "total_found": 0,
                 "total_filtered": 0
             }
         
         try:
-            # Подготавливаем данные для LLM
+            # Prepare data for LLM
             results_summary = self._prepare_results_for_llm(search_results)
             
-            # Создаем промпт
+            # Create prompt
             system_prompt = self._create_system_prompt()
             user_prompt = self._create_user_prompt(query, results_summary)
             
-            # Вызываем LLM
+            # Call LLM
             messages = [
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=user_prompt)
@@ -55,71 +55,71 @@ class SimpleLLMFilter:
             
             response = await self.llm.ainvoke(messages)
             
-            # Парсим ответ LLM
+            # Parse LLM response
             analysis_result = self._parse_llm_response(response.content, search_results)
             
-            logger.info(f"✅ LLM анализ: intent='{analysis_result['intent']}', "
+            logger.info(f"✅ LLM analysis: intent='{analysis_result['intent']}', "
                        f"filtered={analysis_result['total_filtered']}/{analysis_result['total_found']}")
             
             return analysis_result
             
         except Exception as e:
-            logger.error(f"❌ Ошибка в LLM фильтре: {e}")
-            # Возвращаем все результаты в случае ошибки
+            logger.error(f"❌ Error in LLM filter: {e}")
+            # Return all results in case of error
             return {
                 "filtered_results": search_results,
                 "intent": "error",
-                "analysis": f"Ошибка анализа: {e}",
+                "analysis": f"Analysis error: {e}",
                 "total_found": len(search_results),
                 "total_filtered": len(search_results)
             }
     
     def _create_system_prompt(self) -> str:
-        """Создает аналитический системный промпт для фильтрации"""
-        return """Ты экспертный аналитик библиотечных запросов. Проведи глубокий анализ соответствия каждой книги запросу пользователя.
+        """Creates analytical system prompt for filtering"""
+        return """You are an expert library query analyst. Conduct a deep analysis of how well each book matches the user's request.
 
-МЕТОДОЛОГИЯ АНАЛИЗА:
-1. Разбери запрос на компоненты (автор? название? жанр? тема?)
-2. Для каждой книги проверь все компоненты запроса
-3. Оцени логическую совместимость (может ли автор X писать в жанре Y?)
-4. Учти контекст и исключения ("но не", "кроме", "только")
+ANALYSIS METHODOLOGY:
+1. Break down the query into components (author? title? genre? topic?)
+2. For each book, check all query components
+3. Evaluate logical compatibility (can author X write in genre Y?)
+4. Consider context and exceptions ("but not", "except", "only")
 
-КРИТЕРИИ СООТВЕТСТВИЯ:
-- ВСЕ указанные в запросе элементы должны совпадать
-- Проверяй реальность сочетаний (Lovecraft + романтика = невозможно)
-- При конфликтах (автор A + произведение автора B) = отклоняй
-- Синонимы и переводы учитывай (Orwell = Оруэлл)
+MATCHING CRITERIA:
+- ALL elements specified in the query must match
+- Check reality of combinations (Lovecraft + romance = impossible)
+- In conflicts (author A + work by author B) = reject
+- Consider synonyms and translations (Oуэрелл = Orwell)
 
-ПРИНЦИП: Высокая точность важнее полноты. Лучше не найти, чем найти неправильно.
+PRINCIPLE: High accuracy is more important than completeness. Better not to find than to find incorrectly.
 
-ФОРМАТ ОТВЕТА:
+RESPONSE FORMAT:
 {
-  "filtered_indices": [индексы после строгого анализа],
-  "note": "аналитическое обоснование решения"
+  "filtered_indices": [indices after strict analysis],
+  "note": "analytical justification of decision"
 }"""
 
     def _create_user_prompt(self, query: str, results_summary: str) -> str:
-        """Создает пользовательский промпт с запросом и результатами"""
-        return f"""Запрос: "{query}"
+        """Creates user prompt with query and results"""
+        return f"""Query: "{query}"
 
-Результаты:
+Results:
 {results_summary}
 
-Выбери подходящие книги."""
+Select suitable books."""
 
     def _prepare_results_for_llm(self, search_results: List[Dict[str, Any]]) -> str:
-        """Подготавливает результаты поиска для передачи в LLM"""
+        """Prepares search results for passing to LLM"""
         summary_lines = []
         
         for i, result in enumerate(search_results):
             title = result.get('title', 'Unknown')
             author = result.get('author', 'Unknown')
             
-            # Краткое содержание
+            # Brief content
             content = result.get('content', '')
             content_preview = content[:200] + '...' if len(content) > 200 else content
             
-            # Основная информация с content preview
+            # Main information with content preview
             summary_line = f"""[{i}] "{title}" by {author}"""
             if content_preview:
                 summary_line += f"\n   Content preview: {content_preview}"
@@ -129,13 +129,13 @@ class SimpleLLMFilter:
         return "\n".join(summary_lines)
 
     def _parse_llm_response(self, llm_response: str, original_results: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Парсит ответ LLM и возвращает отфильтрованные результаты"""
-        logger.info(f"🔍 Парсинг ответа LLM: {llm_response[:200]}...")
+        """Parses LLM response and returns filtered results"""
+        logger.info(f"🔍 Parsing LLM response: {llm_response[:200]}...")
         
         try:
             import json
             
-            # Очищаем ответ от возможных markdown блоков
+            # Clean response from possible markdown blocks
             clean_response = llm_response.strip()
             if clean_response.startswith('```json'):
                 clean_response = clean_response[7:]
@@ -143,19 +143,19 @@ class SimpleLLMFilter:
                 clean_response = clean_response[:-3]
             clean_response = clean_response.strip()
             
-            # Парсим JSON
+            # Parse JSON
             parsed = json.loads(clean_response)
             
             filtered_indices = parsed.get('filtered_indices', [])
-            note = parsed.get('note', 'Фильтрация выполнена')
+            note = parsed.get('note', 'Filtering completed')
             
-            # Фильтруем результаты по индексам
+            # Filter results by indices
             filtered_results = []
             for idx in filtered_indices:
                 if 0 <= idx < len(original_results):
                     filtered_results.append(original_results[idx])
                 else:
-                    logger.warning(f"⚠️ Невалидный индекс в filtered_indices: {idx}")
+                    logger.warning(f"⚠️ Invalid index in filtered_indices: {idx}")
             
             return {
                 "filtered_results": filtered_results,
@@ -168,14 +168,14 @@ class SimpleLLMFilter:
             }
             
         except json.JSONDecodeError as e:
-            logger.error(f"❌ Ошибка парсинга JSON ответа LLM: {e}")
-            logger.error(f"Ответ LLM: {llm_response}")
+            logger.error(f"❌ Error parsing JSON response from LLM: {e}")
+            logger.error(f"LLM response: {llm_response}")
             
-            # Fallback: возвращаем все результаты
+            # Fallback: return all results
             return {
                 "filtered_results": original_results,
                 "intent": "parse_error",
-                "analysis": f"Не удалось распарсить ответ LLM: {e}",
+                "analysis": f"Failed to parse LLM response: {e}",
                 "negative_filters": "",
                 "uncertainty_note": "",
                 "total_found": len(original_results),
@@ -183,12 +183,12 @@ class SimpleLLMFilter:
             }
         
         except Exception as e:
-            logger.error(f"❌ Неожиданная ошибка при парсинге ответа LLM: {e}")
+            logger.error(f"❌ Unexpected error parsing LLM response: {e}")
             
             return {
                 "filtered_results": original_results,
                 "intent": "error", 
-                "analysis": f"Ошибка обработки: {e}",
+                "analysis": f"Processing error: {e}",
                 "negative_filters": "",
                 "uncertainty_note": "",
                 "total_found": len(original_results),
