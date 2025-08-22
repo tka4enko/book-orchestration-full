@@ -1,0 +1,57 @@
+# Core web framework
+fastapi>=0.115.0
+uvicorn>=0.34.0
+python-multipart>=0.0.20
+aiofiles>=24.1.0
+
+# LangChain ecosystem
+langchain>=0.3.27
+langchain-community>=0.3.27
+langchain-core>=0.3.27
+langchain-openai>=0.3.0
+langchain-chroma>=0.2.5
+
+# LangGraph for orchestration
+langgraph>=0.2.40
+
+# Vector database
+chromadb>=1.0.15
+
+# OpenAI integration
+openai>=1.0.0
+
+# Data validation and serialization
+pydantic>=2.8.0
+
+# Environment variables
+python-dotenv>=1.0.1
+
+# Text processing and similarity
+fuzzywuzzy>=0.18.0
+python-Levenshtein>=0.21.0
+
+# Natural language processing
+nltk>=3.8
+
+# HTTP requests
+requests>=2.31.0
+
+# File processing
+PyPDF2>=3.0.1
+python-docx>=1.1.2
+openpyxl>=3.1.5
+
+# ISBN and language detection
+isbnlib>=3.10.14
+langdetect>=1.0.9
+
+# Search and ranking
+rank_bm25>=0.2.2
+
+# LangSmith for tracing
+langsmith>=0.4.11
+
+# Security enhancements
+python-magic>=0.4.27
+slowapi>=0.1.9
+tenacity>=8.2.3
