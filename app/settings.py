@@ -6,7 +6,11 @@ load_dotenv(find_dotenv(), override=False)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL_CHAT = os.getenv("OPENAI_MODEL_CHAT", "gpt-4o-mini")
 OPENAI_MODEL_EMBED = os.getenv("OPENAI_MODEL_EMBED", "text-embedding-3-small")
-CHROMA_DIR = os.getenv("CHROMA_DIR", ".chroma")
+# Ensure consistent paths for both local and Railway deployment
+# Use paths relative to the app directory for consistent behavior
+_app_root = os.path.dirname(os.path.abspath(__file__))
+CHROMA_DIR = os.getenv("CHROMA_DIR", os.path.join(_app_root, ".chroma"))
+FILE_HASH_STORE_PATH = os.getenv("FILE_HASH_STORE_PATH", os.path.join(_app_root, ".file_hashes.json"))
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "8000"))
 

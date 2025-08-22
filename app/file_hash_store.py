@@ -8,7 +8,10 @@ logger = logging.getLogger(__name__)
 class FileHashStore:
     """Simple file-based storage for tracking file hashes to prevent duplicate uploads"""
     
-    def __init__(self, store_path: str = ".file_hashes.json"):
+    def __init__(self, store_path: str = None):
+        if store_path is None:
+            from .settings import FILE_HASH_STORE_PATH
+            store_path = FILE_HASH_STORE_PATH
         self.store_path = store_path
         self._hashes = {}
         self.load()

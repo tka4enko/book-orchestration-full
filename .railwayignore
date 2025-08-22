@@ -1,0 +1,45 @@
+# Local development files
+.env
+.env.local
+.env.debug
+*.log
+
+# Cache and temporary files  
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Local Chroma database (will use Railway Volume)
+.chroma/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files and reports
+test_*.py
+*_test.py
+test_*.json
+*_report.json
+debug_*.py
+analyze_*.py
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Git
+.git/
+.gitignore

@@ -21,6 +21,15 @@ try:
 except Exception as e:
     logger.warning(f"⚠️ NLTK pre-loading failed: {e}")
 
+# Clear BM25 cache on startup (Railway sleep/restart recovery)
+logger.info("🔧 Clearing BM25 cache for Railway restart recovery...")
+try:
+    from .retrievers import clear_bm25_cache
+    clear_bm25_cache()
+    logger.info("✅ BM25 cache cleared - will rebuild on first search")
+except Exception as e:
+    logger.warning(f"⚠️ BM25 cache clearing failed: {e}")
+
 # Debug LangSmith configuration
 import os
 logger.info(f"🔧 LangSmith config:")
@@ -28,6 +37,22 @@ logger.info(f"   LANGSMITH_TRACING: {os.getenv('LANGSMITH_TRACING')}")
 logger.info(f"   LANGSMITH_PROJECT: {os.getenv('LANGSMITH_PROJECT')}")
 logger.info(f"   LANGSMITH_API_KEY: {'*' * 10}...{os.getenv('LANGSMITH_API_KEY', '')[-4:]}")
 logger.info(f"   LANGSMITH_ENDPOINT: {os.getenv('LANGSMITH_ENDPOINT')}")
+
+# Ensure data directories exist (Railway Volume mount support)
+from .settings import CHROMA_DIR, FILE_HASH_STORE_PATH
+import os
+
+# Create Chroma directory
+os.makedirs(CHROMA_DIR, exist_ok=True)
+logger.info(f"🗂️ Chroma directory ensured: {CHROMA_DIR}")
+
+# Ensure parent directory exists for file hash store
+hash_store_dir = os.path.dirname(FILE_HASH_STORE_PATH)
+if hash_store_dir:
+    os.makedirs(hash_store_dir, exist_ok=True)
+    logger.info(f"📝 File hash store directory ensured: {hash_store_dir}")
+
+logger.info(f"📝 File hash store path: {FILE_HASH_STORE_PATH}")
 
 app = FastAPI(title="BookBot Final 4")
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
