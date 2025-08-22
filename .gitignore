@@ -228,3 +228,4 @@ yarn-error.log*
 bookbot_data/
 vector_store/
 embeddings_cache/ 
+.file_hashes.json
