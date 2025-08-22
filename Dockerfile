@@ -14,5 +14,5 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Command to run the application
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} 
+# Note: Railway will use the start command from settings
+# CMD is not used when start command is specified 
