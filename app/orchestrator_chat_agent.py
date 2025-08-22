@@ -3,6 +3,7 @@ import logging
 import time
 from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
 from .settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
 from .simple_orchestrator import process_simple_search
@@ -12,14 +13,20 @@ logger = logging.getLogger(__name__)
 class ChatAgentState(BaseModel):
     # Базовые поля
     session_id: str
-    message: str
+    message: str  # Текущее сообщение пользователя
+    
+    # История всей сессии (накапливается между вызовами)
+    conversation_history: List[Dict[str, Any]] = Field(default_factory=list)
     
     # Поля для чат-агента
-    chat_history: List[Dict[str, str]] = Field(default_factory=list)
+    chat_history: List[Dict[str, str]] = Field(default_factory=list)  # Deprecated, используем conversation_history
     reply_message: Optional[str] = None
     chips: List[Dict[str, str]] = Field(default_factory=list)
     should_search: bool = False
     should_recommend: bool = False
+    
+    # Намерение пользователя (определяется в node_intent)
+    intent: Optional[str] = None
     
     # Результаты (унифицированные для чата и поиска)
     results: List[Dict[str, Any]] = Field(default_factory=list)
@@ -161,12 +168,22 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
                     metadata = result.get('metadata', {})
                     logger.info(f"📖 Результат {i}: metadata = {metadata}")
                     
-                    # Жанры
-                    book_genres = metadata.get('genres', [])
-                    if isinstance(book_genres, list):
-                        genres.update(book_genres)
-                    elif isinstance(book_genres, str):
-                        genres.add(book_genres)
+                    # Извлекаем жанры из правильных полей
+                    # Primary genre  
+                    primary_genre = metadata.get('primary_genre', '')
+                    if primary_genre:
+                        genres.add(primary_genre)
+                    
+                    # Secondary genres (JSON string)
+                    secondary_genres = metadata.get('secondary_genres', '[]')
+                    if secondary_genres and secondary_genres != '[]':
+                        try:
+                            import json
+                            sec_genres = json.loads(secondary_genres)
+                            if isinstance(sec_genres, list):
+                                genres.update(sec_genres)
+                        except:
+                            pass
                     
                     # Авторы для разнообразия
                     author = metadata.get('author', '')
@@ -251,56 +268,83 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
         
         return state
 
-def route_message(state: ChatAgentState) -> str:
-    """Определяет маршрут с помощью LLM"""
+async def node_intent(state: ChatAgentState) -> ChatAgentState:
+    """Node для анализа намерения пользователя"""
     message = state.message
     
-    logger.info(f"🤖 [router] Анализ сообщения: '{message}'")
+    logger.info(f"🧠 [node_intent] Анализ намерения: '{message}'")
+    logger.info(f"📜 [node_intent] История сессии: {len(state.conversation_history)} сообщений")
+    logger.info(f"🆔 [node_intent] Session ID: {state.session_id}")
+    
+    # Добавляем текущее сообщение в историю сессии
+    state.conversation_history.append({
+        "role": "user",
+        "content": message,
+        "timestamp": time.time()
+    })
     
     try:
         # Быстрый LLM запрос для роутинга
-        router_prompt = f"""Ты роутер для поиска книг. Анализируй запрос и определи достаточно ли информации для поиска.
+        router_prompt = f"""Ты роутер поиска книг. Определи можно ли найти книги по этому запросу.
 
-SEARCH - если есть конкретная информация для поиска в базе данных книг (имена авторов, названия книг, жанры, ISBN)
-RECOMMEND - если пользователь просит помочь выбрать книги или дать рекомендации
-CLARIFY - если пользователь хочет найти книги, но НЕ указал достаточно информации для поиска (слишком общие фразы)
-CHAT - если это обычное общение, не связанное с книгами или поиском
+SEARCH - если есть ЛЮБАЯ поисковая информация:
+- Автор или название книги
+- Жанр или тематика  
+- Год издания или период
+- Описание сюжета или содержания
+- Темы и топики книги
+- Язык книги
+- ISBN номер
+- Любые конкретные детали о книге
 
-Подумай: есть ли в запросе достаточно конкретной информации для поиска книг в базе данных?
+RECOMMEND - просьбы о советах и рекомендациях
 
-Сообщение: "{message}"
+CLARIFY - только очень общие запросы БЕЗ конкретики:
+- "найди книгу" (без указания какую)
+- "ищу что-то почитать" (без деталей)
 
-Ответ (одно слово):"""
+CHAT - обычное общение, не связанное с поиском книг
+
+Запрос: "{message}"
+
+ВАЖНО: Любые жанры и тематики - это SEARCH!
+Можно ли найти конкретные книги по этому запросу?
+Ответ (SEARCH/RECOMMEND/CLARIFY/CHAT):"""
         
         response = llm.invoke([("user", router_prompt)]).content.strip().upper()
         
         logger.info(f"🧠 [router] LLM ответ: '{response}'")
         
-        # Маппинг ответов на nodes
-        if "SEARCH" in response:
-            logger.info(f"🔍 [router] Роутинг к поиску")
-            return "simple_search"
-        elif "RECOMMEND" in response:
-            logger.info(f"💡 [router] Роутинг к рекомендациям") 
-            return "recommendations"
-        elif "CLARIFY" in response:
-            logger.info(f"❓ [router] Роутинг к уточнению")
-            return "clarify"
-        else:
-            logger.info(f"💬 [router] Роутинг к чату")
-            return "chat_response"
-            
-    except Exception as e:
-        logger.error(f"❌ [router] Ошибка LLM роутинга: {e}")
-        # Fallback к простым правилам
-        message_lower = message.lower()
+        # Сохраняем результат анализа в state
+        state.intent = response
         
-        if any(cmd in message_lower for cmd in ["найди", "покажи", "ищу"]):
-            return "simple_search"
-        elif any(phrase in message_lower for phrase in ["посоветуй", "порекомендуй"]):
-            return "recommendations"
-        else:
-            return "chat_response"
+        logger.info(f"✅ [node_intent] Намерение определено: '{response}'")
+        
+        return state
+        
+    except Exception as e:
+        logger.error(f"❌ [node_intent] Ошибка анализа: {e}")
+        state.intent = "CHAT"  # Fallback
+        return state
+
+def route_by_intent(state: ChatAgentState) -> str:
+    """Роутинг на основе определенного намерения"""
+    intent = state.intent
+    
+    logger.info(f"🔄 [route_by_intent] Роутинг для намерения: '{intent}'")
+    
+    if "SEARCH" in intent:
+        logger.info(f"🔍 [route_by_intent] → simple_search")
+        return "simple_search"
+    elif "RECOMMEND" in intent:
+        logger.info(f"💡 [route_by_intent] → recommendations")
+        return "recommendations"
+    elif "CLARIFY" in intent:
+        logger.info(f"❓ [route_by_intent] → clarify")
+        return "clarify"
+    else:
+        logger.info(f"💬 [route_by_intent] → chat_response")
+        return "chat_response"
 
 async def node_simple_search(state: ChatAgentState) -> ChatAgentState:
     """Выполняет простой поиск используя process_simple_search"""
@@ -437,14 +481,19 @@ def node_clarify(state: ChatAgentState) -> ChatAgentState:
 builder = StateGraph(ChatAgentState)
 
 # Добавляем узлы
+builder.add_node("intent", node_intent)  # Новый node для анализа намерения
 builder.add_node("chat_response", node_chat_response_simple)
 builder.add_node("recommendations", node_recommendations)
 builder.add_node("simple_search", node_simple_search)
 builder.add_node("clarify", node_clarify)
 
-# Устанавливаем точку входа с роутингом
-builder.set_conditional_entry_point(
-    route_message,
+# Новая архитектура: сначала анализ намерения, потом роутинг
+builder.set_entry_point("intent")
+
+# Условный роутинг после анализа намерения
+builder.add_conditional_edges(
+    "intent",
+    route_by_intent,
     {
         "simple_search": "simple_search",
         "recommendations": "recommendations", 
@@ -459,5 +508,6 @@ builder.add_edge("recommendations", END)
 builder.add_edge("simple_search", END)
 builder.add_edge("clarify", END)
 
-# Компилируем граф
-chat_agent_graph = builder.compile()
+# Компилируем граф с checkpointer для сохранения состояния между вызовами
+memory = MemorySaver()
+chat_agent_graph = builder.compile(checkpointer=memory)

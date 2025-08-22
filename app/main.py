@@ -395,7 +395,9 @@ async def chat_agent_websocket(websocket: WebSocket):
                 message=user_message, 
                 chat_history=chat_history
             )
-            result = await chat_agent_graph.ainvoke(state)
+            # Используем thread_id для сохранения состояния между сообщениями
+            config = {"configurable": {"thread_id": session_id}}
+            result = await chat_agent_graph.ainvoke(state, config=config)
             
             # Форматируем ответ
             if hasattr(result, "model_dump"):
