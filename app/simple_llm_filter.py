@@ -30,6 +30,15 @@ class SimpleLLMFilter:
         """
         logger.info(f"🧠 LLM analysis of query: '{query}' for {len(search_results)} results")
         
+        # DEBUG: Show what we received from retriever
+        if search_results:
+            logger.info(f"🔍 STAGE 2 - LLM Filter input:")
+            logger.info(f"   First result keys: {list(search_results[0].keys())}")
+            if 'content' in search_results[0]:
+                content_preview = search_results[0]['content'][:300]
+                logger.info(f"   Content preview (300 chars): {content_preview}...")
+                logger.info(f"   Full content length: {len(search_results[0]['content'])} chars")
+        
         if not search_results:
             return {
                 "filtered_results": [],
@@ -43,6 +52,11 @@ class SimpleLLMFilter:
             # Prepare data for LLM
             results_summary = self._prepare_results_for_llm(search_results)
             
+            # DEBUG: Show what we send to LLM
+            logger.info(f"🔍 STAGE 2B - Data prepared for LLM:")
+            logger.info(f"   Results summary length: {len(results_summary)} chars")
+            logger.info(f"   Results summary preview (500 chars): {results_summary[:500]}...")
+            
             # Create prompt
             system_prompt = self._create_system_prompt()
             user_prompt = self._create_user_prompt(query, results_summary)
@@ -53,10 +67,29 @@ class SimpleLLMFilter:
                 HumanMessage(content=user_prompt)
             ]
             
+            # DEBUG: Show what we send to LLM
+            logger.info(f"🔍 STAGE 2C - LLM prompts:")
+            logger.info(f"   System prompt length: {len(system_prompt)} chars")
+            logger.info(f"   FULL SYSTEM PROMPT:")
+            logger.info(f"   {system_prompt}")
+            logger.info(f"   FULL USER PROMPT:")
+            logger.info(f"   {user_prompt}")
+            
             response = await self.llm.ainvoke(messages)
+            
+            # DEBUG: Show LLM raw response
+            logger.info(f"🔍 STAGE 3 - LLM raw response:")
+            logger.info(f"   FULL LLM RESPONSE:")
+            logger.info(f"   {response.content}")
             
             # Parse LLM response
             analysis_result = self._parse_llm_response(response.content, search_results)
+            
+            # DEBUG: Show final filter output
+            logger.info(f"🔍 STAGE 4 - LLM Filter final output:")
+            logger.info(f"   Intent: {analysis_result['intent']}")
+            logger.info(f"   Filtered: {analysis_result['total_filtered']}/{analysis_result['total_found']}")
+            logger.info(f"   Analysis: {analysis_result.get('analysis', 'N/A')}")
             
             logger.info(f"✅ LLM analysis: intent='{analysis_result['intent']}', "
                        f"filtered={analysis_result['total_filtered']}/{analysis_result['total_found']}")
@@ -76,21 +109,34 @@ class SimpleLLMFilter:
     
     def _create_system_prompt(self) -> str:
         """Creates analytical system prompt for filtering"""
-        return """You are an expert library query analyst. Conduct a deep analysis of how well each book matches the user's request.
+        return """You are a library search filter. Your job is simple: find which books match the user's query.
 
-ANALYSIS METHODOLOGY:
-1. Break down the query into components (author? title? genre? topic?)
-2. For each book, check all query components
-3. Evaluate logical compatibility (can author X write in genre Y?)
-4. Consider context and exceptions ("but not", "except", "only")
+FOR ISBN QUERIES (highest priority):
+- If user query contains numbers like "978-12-345-678-9" or "9781234567890"
+- Look for "ISBN:" in each book's content
+- Remove dashes from both: query "978-12-345-678-9" becomes "9781234567890"  
+- Remove dashes from content: "ISBN: 9781234567890" becomes "9781234567890"
+- If numbers match exactly → INCLUDE that book index in filtered_indices
+
+EXAMPLE:
+Query: "978-12-345-678-9" → digits: "9781234567890"
+Book content: "ISBN: 9781234567890" → digits: "9781234567890"  
+Match found → Return {"filtered_indices": [0], "note": "ISBN match"}
+
+OTHER QUERIES:
+- Author: match "Author:" section
+- Title: match book title
+- Topic: match "Topics:" section
 
 MATCHING CRITERIA:
-- ALL elements specified in the query must match
-- Check reality of combinations (Lovecraft + romance = impossible)
-- In conflicts (author A + work by author B) = reject
-- Consider synonyms and translations (Orwell in different languages)
+- ISBN queries: if ISBN found in Content preview → INCLUDE automatically
+- Author queries: check "Author: " section in Content preview
+- Title queries: check book title at start of Content preview
+- Genre queries: check "Genre: " section in Content preview
+- Topic queries: check "Topics: " section in Content preview
+- For multi-criteria: ALL specified elements must match
 
-PRINCIPLE: High accuracy is more important than completeness. Better not to find than to find incorrectly.
+PRINCIPLE: Balance accuracy with helpfulness. Include books that are reasonably related to the query theme, even if not exact matches. Consider semantic similarity scores and related concepts. Higher similarity scores (>0.3) suggest stronger relevance.
 
 RESPONSE FORMAT:
 {
@@ -112,21 +158,15 @@ Select suitable books."""
         summary_lines = []
         
         for i, result in enumerate(search_results):
-            title = result.get('title', 'Unknown')
-            author = result.get('author', 'Unknown')
-            
-            # Brief content
+            # Include similarity score and collection info
             content = result.get('content', '')
-            content_preview = content[:200] + '...' if len(content) > 200 else content
+            score = result.get('score', 0.0)
+            collection = result.get('collection', 'unknown')
             
-            # Main information with content preview
-            summary_line = f"""[{i}] "{title}" by {author}"""
-            if content_preview:
-                summary_line += f"\n   Content preview: {content_preview}"
-            
+            summary_line = f"[{i}] Similarity: {score:.3f} | Collection: {collection}\n{content}"
             summary_lines.append(summary_line)
         
-        return "\n".join(summary_lines)
+        return "\n\n".join(summary_lines)
 
     def _parse_llm_response(self, llm_response: str, original_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Parses LLM response and returns filtered results"""

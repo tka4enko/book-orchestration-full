@@ -80,6 +80,16 @@ class SimpleVectorRetriever:
             
             logger.info(f"✅ Total: books={len(books_results)}, content={len(content_results)} → merged={len(merged_results)} → final={len(final_results)}")
             
+            # DEBUG: Show what we return to orchestrator
+            if final_results:
+                first_result = final_results[0]
+                logger.info(f"🔍 STAGE 1 - SimpleVectorRetriever output:")
+                logger.info(f"   First result keys: {list(first_result.keys())}")
+                logger.info(f"   Title: {first_result.get('title', 'N/A')}")
+                logger.info(f"   Author: {first_result.get('author', 'N/A')}")
+                content_preview = first_result.get('content', '')[:500] + '...' if len(first_result.get('content', '')) > 500 else first_result.get('content', '')
+                logger.info(f"   Content preview (500 chars): {content_preview}")
+            
             return final_results
             
         except Exception as e:

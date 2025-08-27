@@ -6,6 +6,10 @@ load_dotenv(find_dotenv(), override=False)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL_CHAT = os.getenv("OPENAI_MODEL_CHAT", "gpt-4o-mini")
 OPENAI_MODEL_EMBED = os.getenv("OPENAI_MODEL_EMBED", "text-embedding-3-small")
+
+# Development Settings - Only for local development
+IS_DEVELOPMENT = os.getenv("ENVIRONMENT") != "production"
+DEBUG_INGEST_STAGES = IS_DEVELOPMENT and os.getenv("DEBUG_INGEST_STAGES", "true").lower() == "true"
 # Ensure consistent paths for both local and Railway deployment
 # Use paths relative to the app directory for consistent behavior
 _app_root = os.path.dirname(os.path.abspath(__file__))

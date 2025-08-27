@@ -279,13 +279,13 @@ def isbn_exact(query: str) -> List[Document]:
     
     b = books_store()._collection
     
-    # Search by both ISBN formats
-    found_isbn13 = b.get(where={"isbn13": norm["isbn13"]}, include=["documents","metadatas"])
-    found_isbn10 = b.get(where={"isbn10": norm["isbn10"]}, include=["documents","metadatas"]) if norm["isbn10"] else {"documents": [], "metadatas": []}
+    # Search by ISBN (try both normalized ISBN13 and ISBN10)
+    isbn_to_search = norm.get("isbn13") or norm.get("isbn10")
+    found_isbn = b.get(where={"isbn": isbn_to_search}, include=["documents","metadatas"])
     
-    # Combine results, avoiding duplicates
-    all_docs = (found_isbn13.get("documents") or []) + (found_isbn10.get("documents") or [])
-    all_metas = (found_isbn13.get("metadatas") or []) + (found_isbn10.get("metadatas") or [])
+    # Get results directly
+    all_docs = found_isbn.get("documents") or []
+    all_metas = found_isbn.get("metadatas") or []
     
     # Remove duplicates by document_id
     seen_ids = set()

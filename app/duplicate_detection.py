@@ -58,17 +58,16 @@ def level2_isbn_check(base_metadata: Dict) -> DuplicateDetectionResult:
     logger.info("🔍 Level 2: ISBN duplicate detection...")
     
     # Get ISBN from metadata
-    isbn13 = base_metadata.get("isbn13")
-    isbn10 = base_metadata.get("isbn10")
-    raw_isbn = base_metadata.get("isbn") or base_metadata.get("isbn13") or base_metadata.get("isbn10")
+    isbn = base_metadata.get("isbn")
+    if not isbn:
+        # Fallback to old format for backward compatibility
+        raw_isbn = base_metadata.get("isbn13") or base_metadata.get("isbn10")
+        if raw_isbn:
+            norm = normalize_isbn(raw_isbn)
+            if norm:
+                isbn = norm.get("isbn")
     
-    if raw_isbn and not isbn13:
-        norm = normalize_isbn(raw_isbn)
-        if norm:
-            isbn13 = norm.get("isbn13")
-            isbn10 = norm.get("isbn10")
-    
-    if not isbn13:
+    if not isbn:
         logger.info("ℹ️ Level 2: No ISBN found, skipping ISBN check")
         return DuplicateDetectionResult(False, "isbn", "No ISBN to check", 0.0)
     
@@ -76,18 +75,18 @@ def level2_isbn_check(base_metadata: Dict) -> DuplicateDetectionResult:
     books = books_store()
     try:
         # Search by ISBN in Chroma
-        existing = books._collection.get(where={"isbn13": isbn13}, include=["metadatas"])
+        existing = books._collection.get(where={"isbn": isbn}, include=["metadatas"])
         if existing and existing.get("metadatas"):
             existing_meta = existing["metadatas"][0]
             existing_doc_id = existing_meta.get("document_id")
             existing_title = existing_meta.get("title", "Unknown")
             
-            logger.warning(f"🚨 DUPLICATE DETECTED: ISBN {isbn13} already exists")
+            logger.warning(f"🚨 DUPLICATE DETECTED: ISBN {isbn} already exists")
             logger.warning(f"    Existing book: '{existing_title}' (doc_id: {existing_doc_id})")
-            return DuplicateDetectionResult(True, "isbn", f"ISBN {isbn13} already exists for '{existing_title}'", 1.0, existing_doc_id)
+            return DuplicateDetectionResult(True, "isbn", f"ISBN {isbn} already exists for '{existing_title}'", 1.0, existing_doc_id)
         
-        logger.info(f"✅ Level 2: ISBN {isbn13} is unique")
-        return DuplicateDetectionResult(False, "isbn", f"ISBN {isbn13} is unique", 1.0)
+        logger.info(f"✅ Level 2: ISBN {isbn} is unique")
+        return DuplicateDetectionResult(False, "isbn", f"ISBN {isbn} is unique", 1.0)
         
     except Exception as e:
         logger.warning(f"⚠️ Level 2: ISBN check failed: {e}")

@@ -9,7 +9,7 @@ def normalize_isbn(raw: str):
     try:
         i13 = isbn_canonical(s)
         i10 = to_isbn10(i13) if i13 else None
-        return {"isbn13": i13, "isbn10": i10}
+        return {"isbn13": i13, "isbn10": i10, "isbn": i13 or i10}
     except Exception:
         return None
 

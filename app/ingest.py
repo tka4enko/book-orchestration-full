@@ -2,10 +2,10 @@ import os, uuid, hashlib, json, logging
 from typing import List, Dict, Tuple
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
-from .settings import CHROMA_DIR, OPENAI_MODEL_EMBED, OPENAI_API_KEY, CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHUNKS
+from .settings import CHROMA_DIR, OPENAI_MODEL_EMBED, OPENAI_API_KEY, CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHUNKS, DEBUG_INGEST_STAGES
 from .loaders import load_text_from_file
 from .metadata import build_master_meta
-from .metadata_llm import extract_metadata_llm
+from .metadata_llm import extract_metadata_llm, extract_basic_metadata, enhance_metadata_from_chunks
 from .utils_isbn import normalize_isbn
 from .duplicate_detection import detect_duplicates, should_skip_ingestion, calculate_file_hash
 from .file_hash_store import get_file_hash_store
@@ -48,16 +48,24 @@ def split_text_sampled(text: str, chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVE
             break
             
         end = min(n, start + chunk_size)
-        raw_chunks.append(text[start:end])
+        chunk_text = text[start:end]
+        
+        # Skip tiny chunks that are mostly overlap
+        if len(chunk_text) < chunk_size // 3 and len(raw_chunks) > 0:
+            logger.info(f"⚠️ Skipping tiny chunk of {len(chunk_text)} chars (< {chunk_size // 3})")
+            break
+            
+        raw_chunks.append(chunk_text)
+        
+        # If we reached the end, stop
+        if end >= n:
+            break
         
         # Move start forward, ensuring progress
         new_start = end - chunk_overlap
         if new_start <= start:  # Prevent infinite loop
             new_start = start + max(1, chunk_size - chunk_overlap)
         start = new_start
-        
-        if start >= n: 
-            break
             
         if iteration % 100 == 0:
             logger.info(f"🔄 Processing chunk {iteration}, position {start}/{n}")
@@ -119,19 +127,38 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
     base.setdefault("document_id", str(uuid.uuid4()))
     base.setdefault("full_text", full_text)
 
-    prefer_llm = meta_json is None or bool(meta_json.get("prefer_llm", True))
-    if prefer_llm:
+    text_length = len(full_text or "")
+    is_long_book = text_length > 9000
+    
+    if DEBUG_INGEST_STAGES:
+        logger.info(f"🔬 DEBUG: Text length: {text_length}, Long book: {is_long_book}")
+    
+    if is_long_book:
+        logger.info(f"📚 LONG BOOK DETECTED ({text_length} chars) - Using 3-stage analysis")
+        if DEBUG_INGEST_STAGES:
+            logger.info("🔬 DEBUG: Starting Stage 1 - Basic metadata extraction")
+        logger.info("🧠 STAGE 1: Extracting basic metadata from start+end...")
+        llm_meta = extract_basic_metadata(full_text)
+        base = {**llm_meta, **base}
+        logger.info(f"✅ Stage 1 completed: {llm_meta.get('title', 'Unknown title')}")
+        if DEBUG_INGEST_STAGES:
+            logger.info(f"🔬 DEBUG: Stage 1 result - Title: {llm_meta.get('title')}, Author: {llm_meta.get('author')}, Summary length: {len(llm_meta.get('summary', ''))}")
+    else:
+        logger.info(f"📖 SHORT BOOK ({text_length} chars) - Using single-stage analysis")
+        if DEBUG_INGEST_STAGES:
+            logger.info("🔬 DEBUG: Using single-stage LLM analysis")
         logger.info("🧠 Extracting metadata using LLM (OpenAI API call)...")
         llm_meta = extract_metadata_llm(full_text)
         base = {**llm_meta, **base}
         logger.info(f"✅ LLM metadata extracted: {llm_meta.get('title', 'Unknown title')}")
+        if DEBUG_INGEST_STAGES:
+            logger.info(f"🔬 DEBUG: Single-stage result - Title: {llm_meta.get('title')}, Author: {llm_meta.get('author')}, Summary length: {len(llm_meta.get('summary', ''))}")
 
     logger.info("🔍 Processing ISBN...")
-    raw_isbn = base.get("isbn13") or base.get("isbn") or base.get("isbn10")
-    if raw_isbn and not base.get("isbn13"):
+    raw_isbn = base.get("isbn") or base.get("isbn13") or base.get("isbn10")
+    if raw_isbn and not base.get("isbn"):
         norm = normalize_isbn(raw_isbn) or {}
-        base["isbn13"] = norm.get("isbn13")
-        base["isbn10"] = norm.get("isbn10")
+        base["isbn"] = norm.get("isbn")
 
     # DUPLICATE DETECTION - Multi-level checks
     duplicate_results = []
@@ -164,7 +191,11 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
         logger.warning("⚠️ FORCE INGESTION: Skipping duplicate detection")
 
     logger.info("📊 Building master metadata...")
+    if DEBUG_INGEST_STAGES:
+        logger.info("🔬 DEBUG: Starting Stage 2 - Building master metadata and content chunks")
     master_meta = build_master_meta(base)
+    if DEBUG_INGEST_STAGES:
+        logger.info(f"🔬 DEBUG: Master metadata built - Document ID: {master_meta.get('document_id')}")
     
     # Build enriched master_text for better semantic search - AFTER all metadata is complete
     logger.info("🔍 Creating enriched master_text for semantic search...")
@@ -232,50 +263,71 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
     else:
         logger.warning("⚠️ Step 5 - Genres: NO GENRES FOUND!")
     
-    # Add topics for topic-based searches
-    topics = []
+    # Add ISBN for ISBN-based searches
+    if master_meta.get("isbn"):
+        isbn_part = f"ISBN: {master_meta['isbn']}"
+        parts.append(isbn_part)
+        logger.info(f"📝 Step 6 - ISBN: Added '{isbn_part}'")
+    else:
+        logger.warning("⚠️ Step 6 - ISBN: NO ISBN FOUND!")
+
+    # Add topics for topic-based searches (main + mentioned, with deduplication)
+    main_topics_list = []
+    mentioned_topics_list = []
+    
     if master_meta.get("main_topics"):
         main_topics = master_meta["main_topics"]
-        logger.info(f"📝 Step 6a - Main topics raw: {main_topics} (type: {type(main_topics)})")
+        logger.info(f"📝 Step 7a - Main topics raw: {main_topics} (type: {type(main_topics)})")
         if isinstance(main_topics, list):
-            topics.extend(main_topics)
+            main_topics_list.extend(main_topics)
         elif isinstance(main_topics, str):
             try:
                 import json
                 parsed = json.loads(main_topics)
                 if isinstance(parsed, list):
-                    topics.extend(parsed)
+                    main_topics_list.extend(parsed)
                 else:
-                    topics.append(str(main_topics))
+                    main_topics_list.append(str(main_topics))
             except:
-                topics.append(str(main_topics))
+                main_topics_list.append(str(main_topics))
         else:
-            topics.append(str(main_topics))
+            main_topics_list.append(str(main_topics))
     
     if master_meta.get("mentioned_topics"):
         mentioned = master_meta["mentioned_topics"]
-        logger.info(f"📝 Step 6b - Mentioned topics raw: {mentioned} (type: {type(mentioned)})")
+        logger.info(f"📝 Step 7b - Mentioned topics raw: {mentioned} (type: {type(mentioned)})")
         if isinstance(mentioned, list):
-            topics.extend(mentioned)
+            mentioned_topics_list.extend(mentioned)
         elif isinstance(mentioned, str):
             try:
                 import json
                 parsed = json.loads(mentioned)
                 if isinstance(parsed, list):
-                    topics.extend(parsed)
+                    mentioned_topics_list.extend(parsed)
                 else:
-                    topics.append(str(mentioned))
+                    mentioned_topics_list.append(str(mentioned))
             except:
-                topics.append(str(mentioned))
+                mentioned_topics_list.append(str(mentioned))
         else:
-            topics.append(str(mentioned))
+            mentioned_topics_list.append(str(mentioned))
     
-    if topics:
-        topics_part = f"Topics: {', '.join(topics[:10])}"  # Limit to first 10 topics to avoid too long text
+    # Combine topics with deduplication (exact string matches only)
+    main_topics_set = set(main_topics_list)
+    mentioned_unique = [topic for topic in mentioned_topics_list if topic not in main_topics_set]
+    
+    # Create separate sections for main and mentioned topics
+    if main_topics_list or mentioned_unique:
+        topics_parts = []
+        if main_topics_list:
+            topics_parts.append(f"Topics: {', '.join(main_topics_list)}")
+        if mentioned_unique:
+            topics_parts.append(f"Mentioned topics: {', '.join(mentioned_unique)}")
+        
+        topics_part = " — ".join(topics_parts)
         parts.append(topics_part)
-        logger.info(f"📝 Step 6 - Topics: Added '{topics_part}' (from {len(topics)} total topics)")
+        logger.info(f"📝 Step 7 - Topics: Added '{topics_part}' (main: {len(main_topics_list)}, mentioned unique: {len(mentioned_unique)})")
     else:
-        logger.warning("⚠️ Step 6 - Topics: NO TOPICS FOUND!")
+        logger.warning("⚠️ Step 7 - Topics: NO TOPICS FOUND!")
     
     master_text = " — ".join(parts)
     logger.info(f"🔧 All parts before joining: {parts}")
@@ -339,6 +391,150 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
             c_ids.append(cid); c_metas.append(_scalarize_meta(meta))
         cstore.add_texts(texts=chunks, metadatas=c_metas, ids=c_ids)
         logger.info(f"✅ All {len(chunks)} chunks added to content store")
+        
+        # STAGE 3: Enhanced metadata analysis for long books
+        if is_long_book:
+            if DEBUG_INGEST_STAGES:
+                logger.info("🔬 DEBUG: Starting Stage 3 - Enhanced content analysis")
+            logger.info("🧠 STAGE 3: Enhancing metadata from all chunks...")
+            
+            # Combine chunks for comprehensive analysis
+            chunks_sample = chunks[:5]  # Use first 5 chunks to avoid token limits
+            combined_chunks = " ".join(chunks_sample)
+            
+            logger.info(f"📄 Analyzing {len(chunks_sample)} chunks ({len(combined_chunks)} chars)")
+            if DEBUG_INGEST_STAGES:
+                logger.info(f"🔬 DEBUG: Chunks sample preview: {combined_chunks[:200]}...")
+            
+            enhanced_meta = enhance_metadata_from_chunks(combined_chunks)
+            
+            if enhanced_meta:
+                logger.info("🔄 Updating master record with enhanced metadata...")
+                if DEBUG_INGEST_STAGES:
+                    logger.info(f"🔬 DEBUG: Enhanced metadata received - Summary: {bool(enhanced_meta.get('summary'))}, Genres: {enhanced_meta.get('primary_genre')}, Topics: {len(enhanced_meta.get('main_topics', []))}")
+                
+                # Update summary if we got a better one
+                if enhanced_meta.get("summary"):
+                    if DEBUG_INGEST_STAGES:
+                        logger.info(f"🔬 DEBUG: Updating summary from {len(master_meta.get('summary', ''))} to {len(enhanced_meta['summary'])} chars")
+                    master_meta["summary"] = enhanced_meta["summary"]
+                    logger.info(f"📝 Updated summary ({len(enhanced_meta['summary'])} chars)")
+                
+                # Merge genres (keep existing + add new)
+                if enhanced_meta.get("primary_genre") and not master_meta.get("primary_genre"):
+                    master_meta["primary_genre"] = enhanced_meta["primary_genre"]
+                    logger.info(f"🎭 Updated primary genre: {enhanced_meta['primary_genre']}")
+                
+                # Merge secondary genres
+                existing_genres = master_meta.get("secondary_genres") or []
+                new_genres = enhanced_meta.get("secondary_genres") or []
+                if isinstance(existing_genres, str):
+                    existing_genres = []
+                combined_genres = list(set(existing_genres + new_genres))
+                if combined_genres:
+                    master_meta["secondary_genres"] = combined_genres
+                    logger.info(f"🎭 Updated secondary genres: {combined_genres}")
+                
+                # Merge topics
+                existing_main = master_meta.get("main_topics") or []
+                new_main = enhanced_meta.get("main_topics") or []
+                if isinstance(existing_main, str):
+                    existing_main = []
+                combined_main = list(set(existing_main + new_main))
+                if combined_main:
+                    master_meta["main_topics"] = combined_main
+                    logger.info(f"📚 Updated main topics: {combined_main[:5]}...")  # Show first 5
+                
+                existing_mentioned = master_meta.get("mentioned_topics") or []
+                new_mentioned = enhanced_meta.get("mentioned_topics") or []
+                if isinstance(existing_mentioned, str):
+                    existing_mentioned = []
+                combined_mentioned = list(set(existing_mentioned + new_mentioned))
+                if combined_mentioned:
+                    master_meta["mentioned_topics"] = combined_mentioned
+                    logger.info(f"🏷️ Updated mentioned topics: {combined_mentioned[:5]}...")  # Show first 5
+                
+                # Rebuild master_text with enhanced metadata
+                logger.info("🔧 Rebuilding master_text with enhanced metadata...")
+                
+                # Recreate enriched master_text (copy from earlier code)
+                parts = [master_meta["title"]]
+                
+                if master_meta.get("summary"):
+                    parts.append(master_meta["summary"])
+                
+                if master_meta.get("author"):
+                    parts.append(f"Author: {master_meta['author']}")
+                
+                if master_meta.get("year"):
+                    parts.append(f"Year: {master_meta['year']}")
+                
+                # Genres
+                genres = []
+                if master_meta.get("primary_genre"):
+                    genres.append(master_meta["primary_genre"])
+                if master_meta.get("secondary_genres"):
+                    secondary = master_meta["secondary_genres"]
+                    if isinstance(secondary, list):
+                        genres.extend(secondary)
+                if genres:
+                    parts.append(f"Genre: {', '.join(genres)}")
+                
+                # ISBN
+                if master_meta.get("isbn"):
+                    parts.append(f"ISBN: {master_meta['isbn']}")
+                
+                # Topics with deduplication (same logic as regular ingest)
+                topics_parts = []
+                main_topics_list = master_meta.get("main_topics") or []
+                if isinstance(main_topics_list, str):
+                    try:
+                        main_topics_list = json.loads(main_topics_list)
+                    except:
+                        main_topics_list = []
+                if not isinstance(main_topics_list, list):
+                    main_topics_list = []
+                
+                mentioned_topics_list = master_meta.get("mentioned_topics") or []
+                if isinstance(mentioned_topics_list, str):
+                    try:
+                        mentioned_topics_list = json.loads(mentioned_topics_list)
+                    except:
+                        mentioned_topics_list = []
+                if not isinstance(mentioned_topics_list, list):
+                    mentioned_topics_list = []
+                
+                # Combine topics with deduplication (exact string matches only)
+                main_topics_set = set(main_topics_list)
+                mentioned_unique = [topic for topic in mentioned_topics_list if topic not in main_topics_set]
+                
+                # Create separate sections for main and mentioned topics
+                if main_topics_list:
+                    topics_parts.append(f"Topics: {', '.join(main_topics_list)}")
+                if mentioned_unique:
+                    topics_parts.append(f"Mentioned topics: {', '.join(mentioned_unique)}")
+                
+                if topics_parts:
+                    topics_part = " — ".join(topics_parts)
+                    parts.append(topics_part)
+                
+                enhanced_master_text = " — ".join(parts)
+                
+                # Update the master record in ChromaDB
+                logger.info(f"📝 Updating master record with enhanced text ({len(enhanced_master_text)} chars)")
+                if DEBUG_INGEST_STAGES:
+                    logger.info(f"🔬 DEBUG: Final master_text preview: {enhanced_master_text[:300]}...")
+                
+                enhanced_scalarized_meta = _scalarize_meta(master_meta)
+                enhanced_scalarized_meta["is_master_chunk"] = True
+                
+                bstore.add_texts(texts=[enhanced_master_text], metadatas=[enhanced_scalarized_meta], ids=[book_id])
+                logger.info("✅ Master record updated with enhanced metadata")
+                
+                if DEBUG_INGEST_STAGES:
+                    logger.info(f"🔬 DEBUG: Final metadata - Genres: {master_meta.get('primary_genre')}/{len(master_meta.get('secondary_genres', []))}, Topics: {len(master_meta.get('main_topics', []))}/{len(master_meta.get('mentioned_topics', []))}")
+            
+            logger.info("✅ Stage 3 completed - Enhanced analysis done")
     
     # Store file hash for future duplicate detection
     if not force_ingest:
@@ -361,12 +557,16 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
         "book_id": book_id, 
         "document_id": master_meta["document_id"],
         "chunks": len(chunks), 
+        "content_preview": enhanced_master_text if (is_long_book and 'enhanced_master_text' in locals()) else master_text,  # What's stored in ChromaDB
+        "isbn": master_meta.get("isbn"),  # Primary ISBN field
         "metadata": {
             "title": master_meta.get("title"),
             "author": master_meta.get("author"),
             "language": master_meta.get("language"),
             "primary_genre": master_meta.get("primary_genre"),
-            "isbn13": master_meta.get("isbn13")
+            "isbn": master_meta.get("isbn"),  # Primary ISBN
+            "year": master_meta.get("year"),
+            "summary": master_meta.get("summary")
         },
         "duplicate_checks": [{"level": r.level, "is_duplicate": r.is_duplicate, "reason": r.reason, "confidence": r.confidence} for r in duplicate_results] if duplicate_results else [],
         "file_path": file_path

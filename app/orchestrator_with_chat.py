@@ -117,7 +117,7 @@ def node_detect_intent(state: ChatStateWithChat) -> ChatStateWithChat:
     if isbn:
         logger.info(f"�� ISBN detected: {isbn}")
         state.intent = "isbn"
-        state.filters = {"isbn13": isbn["isbn13"], "isbn10": isbn.get("isbn10")}
+        state.filters = {"isbn": isbn.get("isbn13") or isbn.get("isbn10") or isbn.get("isbn")}
         return state
     
     # Enhanced LLM intent detection with context analysis

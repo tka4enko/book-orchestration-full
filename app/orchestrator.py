@@ -351,7 +351,7 @@ def node_detect_intent(state: ChatState) -> ChatState:
     if isbn and state.intent not in ["mixed_filters"]:
         logger.info(f"📖 [orchestrator.py] ISBN override: {isbn}")
         state.intent = "isbn"
-        state.filters = {"isbn13": isbn["isbn13"], "isbn10": isbn.get("isbn10")}
+        state.filters = {"isbn": isbn.get("isbn13") or isbn.get("isbn10") or isbn.get("isbn")}
     
     logger.info(f"✅ [orchestrator.py] Final intent detected:")
     logger.info(f"    Intent: '{state.intent}'")
@@ -368,7 +368,7 @@ def node_detect_intent(state: ChatState) -> ChatState:
     
     if state.intent == "isbn":
         intent_method = "ISBN regex"
-        intent_details["extracted_isbn"] = state.filters.get("isbn13") or state.filters.get("isbn10")
+        intent_details["extracted_isbn"] = state.filters.get("isbn")
     elif hasattr(state, 'mixed_filters_result') and state.mixed_filters_result:
         intent_method = "mixed_filters + LLM"
         intent_details["used_llm"] = "Yes"

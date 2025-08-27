@@ -31,6 +31,32 @@ try:
 except Exception as e:
     logger.warning(f"⚠️ BM25 cache clearing failed: {e}")
 
+# Clear ChromaDB lock files on startup (SQLite WAL/SHM cleanup)
+logger.info("🔧 Cleaning ChromaDB lock files for startup recovery...")
+import glob
+from .settings import CHROMA_DIR
+try:
+    lock_patterns = [
+        f"{CHROMA_DIR}/*.lock",
+        f"{CHROMA_DIR}/*-wal", 
+        f"{CHROMA_DIR}/*-shm",
+        f"{CHROMA_DIR}/**/*.lock",
+        f"{CHROMA_DIR}/**/*-wal",
+        f"{CHROMA_DIR}/**/*-shm"
+    ]
+    cleaned = 0
+    for pattern in lock_patterns:
+        for lock_file in glob.glob(pattern, recursive=True):
+            try:
+                os.remove(lock_file)
+                cleaned += 1
+                logger.info(f"🗑️ Removed lock file: {lock_file}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not remove {lock_file}: {e}")
+    logger.info(f"✅ ChromaDB cleanup: removed {cleaned} lock files")
+except Exception as e:
+    logger.warning(f"⚠️ ChromaDB lock cleanup failed: {e}")
+
 # Debug LangSmith configuration
 import os
 logger.info(f"🔧 LangSmith config:")
@@ -289,12 +315,8 @@ def collection_meta(name: str, limit: int = Query(3, ge=1, le=200)):
     metas = sample.get("metadatas", []) or []
     items = []
     for i, (d, m) in enumerate(zip(docs, metas)):
-        # For books collection, show full content without truncation to see all enriched metadata
-        # For other collections, keep 120 char limit
-        if name == "books":
-            content_preview = d or ""  # Full content for books
-        else:
-            content_preview = (d or "")[:120]  # Truncated for content/other collections
+        # Show full content for all collections - no truncation
+        content_preview = d or ""
             
         items.append({
             "id": m.get("document_id") if isinstance(m, dict) else None,
@@ -335,12 +357,8 @@ def collection_chunks(name: str, document_id: Optional[str] = Query(default=None
     metas = data.get("metadatas", []) or []
     items = []
     for _id, doc, meta in zip(ids, docs, metas):
-        # For books collection, show full content without truncation to see all enriched metadata
-        # For other collections, keep 200 char limit
-        if name == "books":
-            content_preview = doc or ""  # Full content for books
-        else:
-            content_preview = (doc or "")[:200]  # Truncated for content/other collections
+        # Show full content for all collections - no truncation
+        content_preview = doc or ""
             
         items.append({
             "id": _id,
@@ -367,7 +385,7 @@ def search_collection(name: str, q: str = Query(..., min_length=1), k: int = Que
     if store is None:
         return JSONResponse({"error":"unknown collection"}, status_code=404)
     docs = store.similarity_search(q, k=k)
-    results = [{"content_preview": (d.page_content or "")[:200], "content_length": len(d.page_content or ""), "metadata": d.metadata} for d in docs]
+    results = [{"content_preview": (d.page_content or ""), "content_length": len(d.page_content or ""), "metadata": d.metadata} for d in docs]
     return JSONResponse({"collection_name": name, "k": k, "query": q, "results": results})
 
 # Chat history storage for sessions
