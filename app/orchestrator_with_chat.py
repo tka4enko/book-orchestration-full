@@ -26,7 +26,6 @@ class ChatStateWithChat(BaseModel):
     chat_history: List[Dict[str, Any]] = Field(default_factory=list)
     is_chat_mode: bool = False
     reply_message: Optional[str] = None
-    chips: List[Dict[str, Any]] = Field(default_factory=list)
 
 llm = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0, api_key=OPENAI_API_KEY)
 chat_llm = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0.7, api_key=OPENAI_API_KEY)
@@ -54,10 +53,6 @@ Message: {message}
 Return JSON:
 {{
     "reply": "short answer + direction to books",
-    "chips": [
-        {{"text": "Recommend what to read", "action": "chat"}},
-        {{"text": "Find books by topic", "action": "search"}}
-    ]
 }}"""
 
 def _format_chat_history(history: List[Dict[str, Any]]) -> str:
@@ -228,14 +223,9 @@ def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
                 options = state.filters.get("options", [])
                 if len(options) == 2:
                     reply = f"Excellent! What interests you more: {options[0]} or {options[1]}?"  # Translated from Russian: Отлично! Что именно тебя больше интересует...
-                    chips = [
-                        {"text": options[0].capitalize(), "action": "search"},
-                        {"text": options[1].capitalize(), "action": "search"}
-                    ]
                 else:
                     option_list = ", ".join(options)
                     reply = f"Good! Choose exactly what: {option_list}"  # Translated from Russian: Хорошо! Выбери что именно...
-                    chips = [{"text": opt.capitalize(), "action": "search"} for opt in options]
             
             # Handle advice requests
             elif state.filters.get("request_type"):
@@ -243,39 +233,16 @@ def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
                 
                 if request_type == "genre_advice":
                     reply = "С удовольствием помогу выбрать жанр! Что тебе больше по душе?"  # Russian: I'll gladly help choose a genre! What do you prefer?
-                    chips = [
-                        {"text": "Детектив", "action": "search"},  # Russian: Детектив=Detective
-                        {"text": "Фэнтези", "action": "search"},  # Russian: Фэнтези=Fantasy
-                        {"text": "Классика", "action": "search"},  # Russian: Классика=Classics
-                        {"text": "Романы", "action": "search"}  # Russian: Романы=Novels
-                    ]
                 elif request_type == "author_advice":
                     reply = "Отлично! Какого типа авторов предпочитаешь?"  # Russian: Excellent! What type of authors do you prefer?
-                    chips = [
-                        {"text": "Современные авторы", "action": "search"},  # Russian: Современные авторы=Contemporary authors
-                        {"text": "Классики", "action": "search"},  # Russian: Классики=Classics
-                        {"text": "Зарубежные авторы", "action": "search"},  # Russian: Зарубежные авторы=Foreign authors
-                        {"text": "Русские авторы", "action": "search"}  # Russian: Русские авторы=Russian authors
-                    ]
                 else:  # general_advice
                     reply = "Давай подберем что-то интересное! С чего начнем?"  # Russian: Let's find something interesting! Where shall we start?
-                    chips = [
-                        {"text": "Детектив", "action": "search"},  # Russian: Детектив=Detective
-                        {"text": "Фэнтези", "action": "search"},  # Russian: Фэнтези=Fantasy
-                        {"text": "Психология", "action": "search"},  # Russian: Психология=Psychology
-                        {"text": "История", "action": "search"}  # Russian: История=History
-                    ]
             
             # Fallback for other clarify cases
             else:
                 reply = "Чем могу помочь с выбором книг?"  # Russian: How can I help with choosing books?
-                chips = [
-                    {"text": "Посоветуй жанр", "action": "chat"},  # Russian: Посоветуй жанр=Recommend a genre
-                    {"text": "Найти по теме", "action": "search"}  # Russian: Найти по теме=Find by topic
-                ]
                 
             state.reply_message = reply
-            state.chips = chips
             state.is_chat_mode = True
             return state
         
@@ -300,11 +267,6 @@ def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
             # If not agreement - continue insisting, but less intrusively
             result = {
                 "reply": "Я BookBot - помощник по книгам. Может, все-таки посмотрим что-то интересное?",  # Russian: I'm BookBot - a book assistant. Maybe let's look at something interesting after all?
-                "chips": [
-                    {"text": "Посоветуй жанр", "action": "chat"},  # Russian: Посоветуй жанр=Recommend a genre
-                    {"text": "Найти детектив", "action": "search"},  # Russian: Найти детектив=Find detective
-                    {"text": "Найти фэнтези", "action": "search"}  # Russian: Найти фэнтези=Find fantasy
-                ]
             }
         else:
             # Analyze message through LLM
@@ -318,10 +280,8 @@ def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
         
         # Create response
         reply = result.get("reply", "Извините, не понял.")  # Russian: Sorry, didn't understand.
-        chips = result.get("chips", [])
-        
+
         state.reply_message = reply
-        state.chips = chips
         state.is_chat_mode = True
         
         return state
@@ -329,7 +289,6 @@ def node_chat(state: ChatStateWithChat) -> ChatStateWithChat:
     except Exception as e:
         logger.error(f"❌ Chat processing failed: {e}")
         state.reply_message = "Извините, что-то пошло не так. Могу помочь найти интересные книги!"  # Russian: Sorry, something went wrong. I can help find interesting books!
-        state.chips = [{"text": "Найти книги", "action": "search"}]  # Russian: Найти книги=Find books
         state.is_chat_mode = True
         return state
 
@@ -406,7 +365,6 @@ def node_answer(state: ChatStateWithChat) -> ChatStateWithChat:
         state.results = [{
             "message": state.reply_message,
             "intent": "chat",
-            "chips": state.chips
         }]
         return state
     
@@ -430,17 +388,10 @@ def node_answer(state: ChatStateWithChat) -> ChatStateWithChat:
         
         reply = f"Нашёл {len(state.results)} книг по вашему запросу:\n\n" + "\n".join(formatted_results)  # Russian: Found {count} books for your query:
         
-        # Add chips for search
-        chips = [
-            {"text": "Ещё похожие", "action": "search"},  # Russian: Ещё похожие=More similar
-            {"text": "Другой жанр", "action": "search"},  # Russian: Другой жанр=Another genre
-            {"text": "Поговорим о другом", "action": "chat"}  # Russian: Поговорим о другом=Let's talk about something else
-        ]
         
         state.results = [{
             "message": reply,
             "intent": state.intent,
-            "chips": chips
         }]
         
         # Update chat history for search

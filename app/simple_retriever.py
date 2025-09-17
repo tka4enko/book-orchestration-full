@@ -261,7 +261,7 @@ class SimpleVectorRetriever:
         try:
             books_count = self.books_vectorstore._collection.count()
             content_count = self.content_vectorstore._collection.count()
-            
+
             return {
                 "books": books_count,
                 "content": content_count
@@ -269,3 +269,106 @@ class SimpleVectorRetriever:
         except Exception as e:
             logger.error(f"❌ Error getting statistics: {e}")
             return {"books": 0, "content": 0}
+
+    async def get_all_books_metadata(self) -> List[Dict[str, Any]]:
+        """Get metadata for all books in collection for analytics"""
+        try:
+            logger.info("📊 Getting all books metadata for analytics")
+
+            # Get all books from collection without limit
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None,
+                lambda: self.books_vectorstore._collection.get(
+                    include=['metadatas', 'documents']
+                )
+            )
+
+            all_books = []
+            metadatas = results.get('metadatas', [])
+            documents = results.get('documents', [])
+
+            for metadata, document in zip(metadatas, documents):
+                if metadata:
+                    book_data = metadata.copy()
+                    book_data['content'] = document
+                    all_books.append(book_data)
+
+            logger.info(f"📊 Retrieved {len(all_books)} books for analytics")
+            return all_books
+
+        except Exception as e:
+            logger.error(f"❌ Error getting all books metadata: {e}")
+            return []
+
+    async def get_analytics_summary(self, query: str = "") -> Dict[str, Any]:
+        """Get comprehensive analytics summary"""
+        try:
+            logger.info(f"📊 Getting analytics summary for query: '{query}'")
+
+            # Get all books metadata
+            all_books = await self.get_all_books_metadata()
+
+            if not all_books:
+                return {
+                    "total_books": 0,
+                    "genres": {},
+                    "authors": {},
+                    "languages": {},
+                    "years": {},
+                    "summary": "No books found in collection"
+                }
+
+            # Analyze metadata
+            genres = {}
+            authors = {}
+            languages = {}
+            years = {}
+
+            for book in all_books:
+                # Count primary genres
+                genre = book.get('primary_genre', 'Unknown')
+                if genre and genre != 'Unknown':
+                    genres[genre] = genres.get(genre, 0) + 1
+
+                # Count authors
+                author = book.get('author', 'Unknown')
+                if author and author != 'Unknown':
+                    authors[author] = authors.get(author, 0) + 1
+
+                # Count languages
+                language = book.get('language', 'Unknown')
+                if language and language != 'Unknown':
+                    languages[language] = languages.get(language, 0) + 1
+
+                # Count years
+                year = book.get('year')
+                if year and str(year).isdigit():
+                    year_str = str(year)
+                    years[year_str] = years.get(year_str, 0) + 1
+
+            # Sort by popularity
+            top_genres = dict(sorted(genres.items(), key=lambda x: x[1], reverse=True)[:10])
+            top_authors = dict(sorted(authors.items(), key=lambda x: x[1], reverse=True)[:10])
+            top_languages = dict(sorted(languages.items(), key=lambda x: x[1], reverse=True)[:5])
+            top_years = dict(sorted(years.items(), key=lambda x: x[1], reverse=True)[:10])
+
+            return {
+                "total_books": len(all_books),
+                "genres": top_genres,
+                "authors": top_authors,
+                "languages": top_languages,
+                "years": top_years,
+                "summary": f"Analysis of {len(all_books)} books in collection"
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Error getting analytics summary: {e}")
+            return {
+                "total_books": 0,
+                "genres": {},
+                "authors": {},
+                "languages": {},
+                "years": {},
+                "summary": f"Analytics error: {str(e)}"
+            }
