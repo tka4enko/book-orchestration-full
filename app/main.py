@@ -407,10 +407,13 @@ async def chat_agent_websocket(websocket: WebSocket):
             # Get history for session
             chat_history = chat_histories.get(session_id, [])
             
-            # Use new chat-agent orchestrator
+            # Create HumanMessage from user input
+            from langchain_core.messages import HumanMessage
+
+            # Use new chat-agent orchestrator with proper LangGraph messages
             state = ChatAgentState(
-                session_id=session_id, 
-                message=user_message, 
+                session_id=session_id,
+                messages=[HumanMessage(content=user_message)],
                 chat_history=chat_history
             )
             # Use thread_id to preserve state between messages

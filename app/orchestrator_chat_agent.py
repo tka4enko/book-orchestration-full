@@ -1,10 +1,11 @@
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Annotated
 import logging
 import time
 from pydantic import BaseModel, Field
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END, add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from .settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
 from .simple_orchestrator import process_simple_search
 from .smart_analytics_orchestrator import process_smart_analytics
@@ -12,27 +13,27 @@ from .smart_analytics_orchestrator import process_smart_analytics
 logger = logging.getLogger(__name__)
 
 class ChatAgentState(BaseModel):
+    # Standard LangGraph messages for conversation context
+    messages: Annotated[List[BaseMessage], add_messages] = Field(default_factory=list)
+
     # Base fields
     session_id: str
-    message: str  # Current user message
-    
-    # Session history (accumulates between calls)
+
+    # User intent (determined in node_intent)
+    intent: Optional[str] = None
+
+    # Results (unified for chat and search)
+    results: List[Dict[str, Any]] = Field(default_factory=list)
+
+    # Performance metrics
+    performance_metrics: Dict[str, float] = Field(default_factory=dict)
+
+    # Legacy fields for compatibility (will be deprecated)
     conversation_history: List[Dict[str, Any]] = Field(default_factory=list)
-    
-    # Chat agent fields
-    chat_history: List[Dict[str, str]] = Field(default_factory=list)  # Deprecated, use conversation_history
+    chat_history: List[Dict[str, str]] = Field(default_factory=list)
     reply_message: Optional[str] = None
     should_search: bool = False
     should_recommend: bool = False
-    
-    # User intent (determined in node_intent)
-    intent: Optional[str] = None
-    
-    # Results (unified for chat and search)
-    results: List[Dict[str, Any]] = Field(default_factory=list)
-    
-    # Performance metrics
-    performance_metrics: Dict[str, float] = Field(default_factory=dict)
 
 # LLM is used only for recommendations, not for routing
 llm = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0.7, api_key=OPENAI_API_KEY)
@@ -53,37 +54,41 @@ def _format_chat_history(history: List[Dict[str, str]]) -> str:
 def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
     """Simple chat response without LLM analysis"""
     start_time = time.time()
-    
+
     logger.info("💬 [chat_agent] node_chat_response_simple - Simple chat response...")
-    
-    # Add user message to history
-    if not state.chat_history:
-        state.chat_history = []
-    
-    state.chat_history.append({
-        "role": "user",
-        "content": state.message
-    })
-    
+
+    # Get current message content
+    current_message = state.messages[-1] if state.messages else None
+    if not current_message:
+        logger.error("❌ [node_chat_response_simple] No messages in state")
+        return state
+
+    message_content = current_message.content
+
     try:
         # Simple responses based on keywords
-        message_lower = state.message.lower()
+        message_lower = message_content.lower()
         
-        if any(greeting in message_lower for greeting in ["привет", "здравствуй", "hello", "hi"]):  # Russian: привет=hello, здравствуй=greetings
+        if any(greeting in message_lower for greeting in ["привет", "здравствуй", "hello", "hi", "greetings"]):
             reply = "Hello! How are you? How can I help you with books?"
-        elif any(phrase in message_lower for phrase in ["не знаю", "скучно", "что делать"]):  # Russian: не знаю=don't know, скучно=boring, что делать=what to do
+        elif any(phrase in message_lower for phrase in ["не знаю", "скучно", "что делать", "don't know", "boring", "what to do"]):
             reply = "I understand! Maybe let's read something interesting? What genre do you like?"
         else:
             reply = "Interesting! Tell me more - what exactly interests you?"
         
+        # Add AI response to messages (standard LangGraph approach)
+        state.messages.append(AIMessage(content=reply))
+
         # Form result
         state.results = [{
             "message": reply,
             "intent": "chat",
             "chat_mode": True
         }]
-        
-        # Add to history
+
+        # Add to history (legacy compatibility)
+        if not state.chat_history:
+            state.chat_history = []
         state.chat_history.append({
             "role": "assistant",
             "content": reply
@@ -91,8 +96,13 @@ def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
         
     except Exception as e:
         logger.error(f"❌ Error in chat_response_simple: {e}")
+        error_message = "An error occurred. How can I help?"
+
+        # Add error message to messages
+        state.messages.append(AIMessage(content=error_message))
+
         state.results = [{
-            "message": "An error occurred. How can I help?",  # Translated from Russian: Произошла ошибка. Чем могу помочь?
+            "message": error_message,
             "intent": "error"
         }]
     
@@ -187,17 +197,20 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
         else:
             reply = "Unfortunately, the book database is empty. Try uploading some books first."
         
+        # Add AI response to messages (standard LangGraph approach)
+        state.messages.append(AIMessage(content=reply))
+
         # Form result
         state.results = [{
             "message": reply,
             "intent": "recommendations",
             "recommendation_mode": True
         }]
-        
-        # Add to chat history
+
+        # Add to chat history (legacy compatibility)
         if not state.chat_history:
             state.chat_history = []
-        
+
         state.chat_history.append({
             "role": "assistant",
             "content": reply
@@ -212,10 +225,13 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
         
     except Exception as e:
         logger.error(f"❌ [chat_agent] Recommendation generation error: {e}")
-        
+
         # Return error as result
-        error_message = "Sorry, can't give recommendations now. Try searching for something specific!"  # Translated from Russian: Извините, не могу сейчас дать рекомендации...
-        
+        error_message = "Sorry, can't give recommendations now. Try searching for something specific!"
+
+        # Add error message to messages
+        state.messages.append(AIMessage(content=error_message))
+
         state.results = [{
             "message": error_message,
             "intent": "error",
@@ -229,22 +245,34 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
 
 async def node_intent(state: ChatAgentState) -> ChatAgentState:
     """Node for analyzing user intent"""
-    message = state.message
-    
-    logger.info(f"🧠 [node_intent] Intent analysis: '{message}'")
-    logger.info(f"📜 [node_intent] Session history: {len(state.conversation_history)} messages")
+    # Get current message from LangGraph messages
+    current_message = state.messages[-1] if state.messages else None
+    if not current_message:
+        logger.error("❌ [node_intent] No messages in state")
+        state.intent = "CHAT"
+        return state
+
+    message_content = current_message.content
+
+    logger.info(f"🧠 [node_intent] Intent analysis: '{message_content}'")
+    logger.info(f"📜 [node_intent] Message history: {len(state.messages)} messages")
     logger.info(f"🆔 [node_intent] Session ID: {state.session_id}")
-    
-    # Add current message to session history
-    state.conversation_history.append({
-        "role": "user",
-        "content": message,
-        "timestamp": time.time()
-    })
+
+    # Format conversation context from messages
+    context = ""
+    if len(state.messages) > 1:
+        # Get last few messages for context (excluding current message)
+        recent_messages = state.messages[-6:-1]  # Last 5 messages before current
+        context_lines = []
+        for msg in recent_messages:
+            role = "assistant" if isinstance(msg, AIMessage) else "user"
+            context_lines.append(f"{role}: {msg.content}")
+        context = "\n".join(context_lines)
     
     try:
-        # Quick LLM request for routing
-        router_prompt = f"""You are a book search router. Determine the intent for this query.
+        # Build router prompt with conversation context
+        if context:
+            router_prompt = f"""You are a book search router. Determine the intent for this query using conversation context.
 
 SEARCH - if there is ANY search information:
 - Author or book title
@@ -273,7 +301,49 @@ CLARIFY - only very general queries WITHOUT specifics:
 
 CHAT - regular conversation not related to book search
 
-Query: "{message}"
+CONVERSATION CONTEXT:
+{context}
+
+CURRENT QUERY: "{message_content}"
+
+IMPORTANT:
+- Use conversation context to understand references like "that author", "those books", "more like this"
+- Any genres and topics for finding books - this is SEARCH!
+- Statistics and counting requests - this is ANALYTICS!
+- If user agrees or responds to assistant's previous suggestions, infer intent from context
+
+Answer (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
+        else:
+            router_prompt = f"""You are a book search router. Determine the intent for this query.
+
+SEARCH - if there is ANY search information:
+- Author or book title
+- Genre or topic
+- Publication year or period
+- Plot or content description
+- Book themes and topics
+- Book language
+- ISBN number
+- Any specific details about the book
+
+ANALYTICS - if user wants statistics, counts, trends, or analysis:
+- "сколько книг" (how many books)
+- "какие самые популярные" (which are most popular)
+- "статистика по жанрам" (statistics by genres)
+- "топ авторов" (top authors)
+- "тренды" (trends)
+- "подсчитай" (count)
+- "проанализируй" (analyze)
+
+RECOMMEND - requests for advice and recommendations
+
+CLARIFY - only very general queries WITHOUT specifics:
+- "find a book" (without specifying which one)
+- "looking for something to read" (without details)
+
+CHAT - regular conversation not related to book search
+
+Query: "{message_content}"
 
 IMPORTANT: Any genres and topics for finding books - this is SEARCH!
 Statistics and counting requests - this is ANALYTICS!
@@ -320,60 +390,65 @@ def route_by_intent(state: ChatAgentState) -> str:
 async def node_simple_search(state: ChatAgentState) -> ChatAgentState:
     """Performs simple search using process_simple_search"""
     logger.info("🔍 [chat_agent] node_simple_search - Using simple_orchestrator...")
-    
+
     start_time = time.time()
-    
+
     try:
+        # Get current message content
+        current_message = state.messages[-1] if state.messages else None
+        if not current_message:
+            logger.error("❌ [node_simple_search] No messages in state")
+            return state
+
+        message_content = current_message.content
+
         # Call simple search
-        search_result = await process_simple_search(state.session_id, state.message)
-        
+        search_result = await process_simple_search(state.session_id, message_content)
+
         # Use ready formatted response from simple_orchestrator
-        message = search_result.get('response', 'Results not found')
-        
-        # Add to results
+        response_text = search_result.get('response', 'Results not found')
+
+        # Add AI response to messages (standard LangGraph approach)
+        state.messages.append(AIMessage(content=response_text))
+
+        # Add to results for compatibility
         state.results = [{
-            "message": message,
+            "message": response_text,
             "intent": search_result.get('intent', 'search'),
             "search_mode": True,
             "original_response": search_result.get('response'),
             "raw_results": search_result.get('results', [])
         }]
-        
-        # Add to chat history
-        if not state.chat_history:
-            state.chat_history = []
-        
-        state.chat_history.append({
-            "role": "assistant",
-            "content": message
-        })
-        
+
         # Copy performance metrics
         if search_result.get('performance_metrics'):
             state.performance_metrics.update(search_result['performance_metrics'])
-        
+
         execution_time = (time.time() - start_time) * 1000
         state.performance_metrics["simple_search_ms"] = execution_time
-        
+
         logger.info(f"✅ [chat_agent] Simple search completed in {execution_time:.1f}ms")
-        
+
         return state
-        
+
     except Exception as e:
         logger.error(f"❌ [chat_agent] Simple search error: {e}")
-        
+
         # Return error as result
-        error_message = "Sorry, a search error occurred. Try rephrasing your query."  # Translated from Russian: Извините, произошла ошибка при поиске...
-        
+        error_message = "Sorry, a search error occurred. Try rephrasing your query."
+
+        # Add error message to messages
+        state.messages.append(AIMessage(content=error_message))
+
         state.results = [{
             "message": error_message,
             "intent": "error",
             "error": str(e)
         }]
-        
+
         execution_time = (time.time() - start_time) * 1000
         state.performance_metrics["simple_search_error_ms"] = execution_time
-        
+
         return state
 
 async def node_analytics(state: ChatAgentState) -> ChatAgentState:
@@ -383,29 +458,31 @@ async def node_analytics(state: ChatAgentState) -> ChatAgentState:
     start_time = time.time()
 
     try:
+        # Get current message content
+        current_message = state.messages[-1] if state.messages else None
+        if not current_message:
+            logger.error("❌ [node_analytics] No messages in state")
+            return state
+
+        message_content = current_message.content
+
         # Call analytics processing
-        analytics_result = await process_smart_analytics(state.session_id, state.message)
+        analytics_result = await process_smart_analytics(state.session_id, message_content)
 
         # Use ready formatted response from analytics_orchestrator
-        message = analytics_result.get('response', 'Analytics not available')
+        response_text = analytics_result.get('response', 'Analytics not available')
 
-        # Add to results
+        # Add AI response to messages (standard LangGraph approach)
+        state.messages.append(AIMessage(content=response_text))
+
+        # Add to results for compatibility
         state.results = [{
-            "message": message,
+            "message": response_text,
             "intent": analytics_result.get('intent', 'analytics'),
             "analytics_mode": True,
             "analytics_stats": analytics_result.get('analytics_stats', {}),
             "raw_results": analytics_result.get('results', [])
         }]
-
-        # Add to chat history
-        if not state.chat_history:
-            state.chat_history = []
-
-        state.chat_history.append({
-            "role": "assistant",
-            "content": message
-        })
 
         # Copy performance metrics
         if analytics_result.get('performance_metrics'):
@@ -424,6 +501,9 @@ async def node_analytics(state: ChatAgentState) -> ChatAgentState:
         # Return error as result
         error_message = "Sorry, analytics processing failed. Try rephrasing your query."
 
+        # Add error message to messages
+        state.messages.append(AIMessage(content=error_message))
+
         state.results = [{
             "message": error_message,
             "intent": "error",
@@ -438,21 +518,20 @@ async def node_analytics(state: ChatAgentState) -> ChatAgentState:
 def node_clarify(state: ChatAgentState) -> ChatAgentState:
     """Requests clarification from user"""
     start_time = time.time()
-    
+
     logger.info("❓ [chat_agent] node_clarify - Clarification request...")
-    
-    # Add user message to history
-    if not state.chat_history:
-        state.chat_history = []
-    
-    state.chat_history.append({
-        "role": "user",
-        "content": state.message
-    })
-    
+
+    # Get current message content
+    current_message = state.messages[-1] if state.messages else None
+    if not current_message:
+        logger.error("❌ [node_clarify] No messages in state")
+        return state
+
+    message_content = current_message.content
+
     try:
         # Form response with clarification request
-        message_lower = state.message.lower()
+        message_lower = message_content.lower()
         
         if any(word in message_lower for word in ["найти", "найду", "ищу", "поиск"]):  # Russian: найти=find, найду=will find, ищу=searching, поиск=search
             reply = "What exactly do you want to find? Specify author, book title or genre."
@@ -461,14 +540,19 @@ def node_clarify(state: ChatAgentState) -> ChatAgentState:
         else:
             reply = "I can help find books! What exactly interests you?"
         
+        # Add AI response to messages (standard LangGraph approach)
+        state.messages.append(AIMessage(content=reply))
+
         # Form result
         state.results = [{
             "message": reply,
             "intent": "clarify",
             "clarify_mode": True
         }]
-        
-        # Add to history
+
+        # Add to history (legacy compatibility)
+        if not state.chat_history:
+            state.chat_history = []
         state.chat_history.append({
             "role": "assistant",
             "content": reply
@@ -476,8 +560,13 @@ def node_clarify(state: ChatAgentState) -> ChatAgentState:
         
     except Exception as e:
         logger.error(f"❌ Error in node_clarify: {e}")
+        error_message = "How can I help? Looking for something specific?"
+
+        # Add error message to messages
+        state.messages.append(AIMessage(content=error_message))
+
         state.results = [{
-            "message": "How can I help? Looking for something specific?",
+            "message": error_message,
             "intent": "error"
         }]
     

@@ -157,3 +157,4 @@ Enable detailed logging by checking:
 - Health check: `GET /health`
 
 The system uses extensive logging throughout the pipeline to track intent detection, search steps, and result formatting.
+- all code comments promtp should be in English
