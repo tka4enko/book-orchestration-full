@@ -209,6 +209,52 @@ Be conversational and helpful. Suggest concrete options they can choose from."""
         return "I'd love to help you find books! Could you be more specific about what you're looking for? You can mention author names, genres, or topics that interest you."
 
 
+async def _generate_engaging_chat_response(message_content: str, state: ChatAgentState) -> str:
+    """Generate engaging, human-like chat response that motivates book exploration"""
+    try:
+        # Build conversation context
+        conversation_context = ""
+        if len(state.messages) > 1:
+            recent_messages = state.messages[-4:-1]  # Last 3 messages for context
+            context_lines = []
+            for msg in recent_messages:
+                role = "user" if isinstance(msg, HumanMessage) else "assistant"
+                context_lines.append(f"{role}: {msg.content}")
+            conversation_context = "\n".join(context_lines)
+
+        chat_prompt = f"""You are a friendly, passionate librarian who loves books and reading. You're having a casual conversation with someone.
+
+CONVERSATION CONTEXT:
+{conversation_context if conversation_context else "This is the start of the conversation"}
+
+USER'S MESSAGE: "{message_content}"
+
+YOUR PERSONALITY:
+- Warm, enthusiastic, and genuinely interested in people
+- Passionate about books but not pushy
+- Natural conversationalist who responds authentically
+- Subtly guides conversations toward reading and books
+- Uses casual, friendly language
+
+RESPONSE GUIDELINES:
+1. Respond naturally to what they said (acknowledge their message)
+2. Show genuine interest and empathy
+3. Gently connect to books/reading when appropriate
+4. Ask engaging follow-up questions
+5. Be conversational, not robotic
+6. If they seem bored/lost, suggest books as a solution
+7. Share enthusiasm for reading in a natural way
+
+Generate a warm, human response that feels like talking to a friend who happens to love books."""
+
+        response = llm.invoke([("user", chat_prompt)])
+        return response.content.strip()
+
+    except Exception as e:
+        logger.error(f"❌ Error generating engaging chat response: {e}")
+        return "That's interesting! You know, I find that a good book can often help with whatever we're going through. What kind of stories do you usually enjoy?"
+
+
 def _format_chat_history(history: List[Dict[str, str]]) -> str:
     """Formats chat history for prompt"""
     if not history:
@@ -222,11 +268,11 @@ def _format_chat_history(history: List[Dict[str, str]]) -> str:
 
     return "\n".join(formatted)
 
-def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
-    """Simple chat response without LLM analysis"""
+async def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
+    """Intelligent chat response with book motivation"""
     start_time = time.time()
 
-    logger.info("💬 [chat_agent] node_chat_response_simple - Simple chat response...")
+    logger.info("💬 [chat_agent] node_chat_response_simple - Intelligent chat response...")
 
     # Get current message content
     current_message = state.messages[-1] if state.messages else None
@@ -237,15 +283,8 @@ def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
     message_content = current_message.content
 
     try:
-        # Simple responses based on keywords
-        message_lower = message_content.lower()
-        
-        if any(greeting in message_lower for greeting in ["привет", "здравствуй", "hello", "hi", "greetings"]):
-            reply = "Hello! How are you? How can I help you with books?"
-        elif any(phrase in message_lower for phrase in ["не знаю", "скучно", "что делать", "don't know", "boring", "what to do"]):
-            reply = "I understand! Maybe let's read something interesting? What genre do you like?"
-        else:
-            reply = "Interesting! Tell me more - what exactly interests you?"
+        # Generate human-like response that guides to books
+        reply = await _generate_engaging_chat_response(message_content, state)
         
         # Add AI response to messages (standard LangGraph approach)
         state.messages.append(AIMessage(content=reply))
@@ -475,12 +514,14 @@ async def node_intent(state: ChatAgentState) -> ChatAgentState:
 - Wants personal advice on what to read
 - Seeking curated suggestions without specific criteria
 
-❓ CLARIFY - Very vague requests needing more information:
-- "find a book" (no details), "I want to read" (no specifics)
-- "something interesting" (too general)
+❓ CLARIFY - Very vague SEARCH requests needing more information:
+- "find a book" (no search details), "I want to read" (no search specifics)
+- Vague search queries that need clarification to proceed
 
-💬 CHAT - Casual conversation not about finding/recommending books:
+💬 CHAT - Casual conversation, greetings, or general discussion:
 - Greetings, personal questions, general chat
+- Statements about not wanting to read or book preferences
+- General life conversations unrelated to book searching
 
 CONVERSATION CONTEXT:
 Previous Intent: {state.previous_intent or "None"}
@@ -493,28 +534,14 @@ Recent Messages:
 
 CURRENT QUERY: "{message_content}"
 
-CONTEXT-AWARE ANALYSIS RULES:
-1. CONTINUITY: If query is ambiguous (like "еще", "а теперь антиутопию", "что-то другое"), consider previous intent:
-   - If previous was RECOMMEND → stay in RECOMMEND unless user explicitly asks for specific search
-   - If previous was SEARCH → stay in SEARCH unless user asks for general suggestions
+CONTEXT-AWARE ANALYSIS:
+Use your intelligence to understand user intent. Prioritize explicit intent over context:
 
-2. GENRE MENTIONS: Analyze how genres are mentioned:
-   - "посоветуй антиутопию" = RECOMMEND (asking for suggestions in dystopian genre)
-   - "найди антиутопию" = SEARCH (looking for specific dystopian books)
-   - "покажи фантастику" = SEARCH (show me sci-fi books)
-   - "что почитать из фантастики" = RECOMMEND (what to read from sci-fi)
+1. EXPLICIT INTENT FIRST: If user gives specific search criteria (titles, authors, genres), classify as SEARCH regardless of previous context
+2. CONTEXT FOR AMBIGUITY: Only use previous intent for truly ambiguous queries
+3. CLEAR TRANSITIONS: Users can switch between different intents - don't force continuity
 
-3. CONTEXT FLOW: Consider conversation progression:
-   - After recommendations, "еще" usually means "more recommendations"
-   - After search results, "что-то другое" might mean "different search" or "switch to recommendations"
-   - "а теперь X" often continues in same mode but changes criteria
-
-4. IMPLICIT INTENT: Use conversation intelligence:
-   - If user established preferences in recommendations, ambiguous follow-ups likely stay in RECOMMEND
-   - If user was searching specific criteria, ambiguous follow-ups likely modify search
-   - Context clues are more important than literal word matching
-
-5. FALLBACK LOGIC: When truly ambiguous, prefer previous intent over default routing
+Apply your natural language understanding to determine intent, giving priority to what the user explicitly asks for in their current message.
 
 Answer only the intent (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
         
