@@ -22,6 +22,10 @@ class ChatAgentState(BaseModel):
     # User intent (determined in node_intent)
     intent: Optional[str] = None
 
+    # User preferences and context tracking
+    user_preferences: Dict[str, Any] = Field(default_factory=dict)
+    seen_books: set = Field(default_factory=set)  # Books mentioned/recommended in this session
+
     # Results (unified for chat and search)
     results: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -132,79 +136,73 @@ def node_chat_response(state: ChatAgentState) -> ChatAgentState:
     return state
 
 async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
-    """Generates recommendations based on what's in ChromaDB"""
-    logger.info("💡 [chat_agent] node_recommendations - Generating recommendations from database...")
-    
+    """Generate personalized recommendations using smart recommendation orchestrator"""
+    logger.info("💡 [chat_agent] node_recommendations - Using smart recommendation orchestrator...")
+
     start_time = time.time()
-    
+
     try:
-        # Connect to ChromaDB to get statistics and real genres
-        from .simple_retriever import SimpleVectorRetriever
-        
-        retriever = SimpleVectorRetriever()
-        stats = retriever.get_collection_stats()
-        
-        logger.info(f"📊 Database statistics: books={stats['books']}, content={stats['content']}")
-        
-        if stats['books'] > 0:
-            # Get real genres from database
-            try:
-                # Query books collection to get metadata
-                sample_results = await retriever.search("", k=20)  # Get books for genre analysis
-                
-                # Extract unique genres from metadata
-                genres = set()
-                authors = set()
-                
-                logger.info(f"📊 Analyzing {len(sample_results)} results to extract genres")
-                
-                for i, result in enumerate(sample_results):
-                    metadata = result.get('metadata', {})
-                    logger.info(f"📖 Result {i}: metadata = {metadata}")
-                    
-                    # Extract genres from correct fields
-                    # Primary genre  
-                    primary_genre = metadata.get('primary_genre', '')
-                    if primary_genre:
-                        genres.add(primary_genre)
-                    
-                    # Secondary genres (JSON string)
-                    secondary_genres = metadata.get('secondary_genres', '[]')
-                    if secondary_genres and secondary_genres != '[]':
-                        try:
-                            import json
-                            sec_genres = json.loads(secondary_genres)
-                            if isinstance(sec_genres, list):
-                                genres.update(sec_genres)
-                        except:
-                            pass
-                    
-                    # Authors for diversity
-                    author = metadata.get('author', '')
-                    if author and author != 'Unknown':
-                        authors.add(author)
-                
-                logger.info(f"🎯 Found genres: {list(genres)}")
-                logger.info(f"👤 Found authors: {list(authors)}")
-                
-                
-                reply = "Below I've provided several interesting options from my collection:"
-                
-            except Exception as e:
-                logger.error(f"❌ Error getting genres: {e}")
-                # Fallback to simple options
-                reply = "Below I've provided several options from my collection:"
-        else:
-            reply = "Unfortunately, the book database is empty. Try uploading some books first."
-        
+        # Get current message content
+        current_message = state.messages[-1] if state.messages else None
+        if not current_message:
+            logger.error("❌ [node_recommendations] No messages in state")
+            return state
+
+        message_content = current_message.content
+
+        # Convert messages to chat history format
+        chat_history = []
+        for msg in state.messages[:-1]:  # Exclude current message
+            role = "assistant" if isinstance(msg, AIMessage) else "user"
+            chat_history.append({"role": role, "content": msg.content})
+
+        # Get books seen in this conversation to exclude from recommendations
+        seen_books = set()
+        if hasattr(state, 'seen_books') and state.seen_books:
+            seen_books = state.seen_books
+
+        # Extract seen book titles from previous results in this session
+        for msg in state.messages:
+            if isinstance(msg, AIMessage) and "**" in msg.content:
+                # Simple extraction of book titles from previous responses
+                import re
+                book_titles = re.findall(r'\*\*(.*?)\*\*', msg.content)
+                seen_books.update(book_titles)
+
+        # Use smart recommendation orchestrator
+        from .smart_recommendation_orchestrator import process_smart_recommendations
+
+        recommendation_result = await process_smart_recommendations(
+            session_id=state.session_id,
+            current_message=message_content,
+            chat_history=chat_history,
+            user_preferences=state.user_preferences if hasattr(state, 'user_preferences') else None,
+            exclude_books=seen_books
+        )
+
+        # Extract response and update state
+        reply = recommendation_result.get("response", "Sorry, I couldn't generate recommendations right now.")
+        recommendations = recommendation_result.get("recommendations", [])
+
+        # Update seen books with new recommendations
+        if not hasattr(state, 'seen_books'):
+            state.seen_books = set()
+
+        for rec in recommendations:
+            if rec.get("title"):
+                state.seen_books.add(rec["title"])
+
         # Add AI response to messages (standard LangGraph approach)
         state.messages.append(AIMessage(content=reply))
 
-        # Form result
+        # Form structured result
         state.results = [{
             "message": reply,
             "intent": "recommendations",
-            "recommendation_mode": True
+            "recommendation_mode": True,
+            "recommendations": recommendations,
+            "recommendation_stats": recommendation_result.get("recommendation_stats", {}),
+            "performance_metrics": recommendation_result.get("performance_metrics", {})
         }]
 
         # Add to chat history (legacy compatibility)
@@ -215,19 +213,20 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
             "role": "assistant",
             "content": reply
         })
-        
+
         execution_time = (time.time() - start_time) * 1000
         state.performance_metrics["recommendations_ms"] = execution_time
-        
-        logger.info(f"✅ [chat_agent] Recommendations generated in {execution_time:.1f}ms")
-        
+
+        logger.info(f"✅ [chat_agent] Smart recommendations generated in {execution_time:.1f}ms")
+        logger.info(f"📊 [chat_agent] Generated {len(recommendations)} recommendations")
+
         return state
-        
+
     except Exception as e:
-        logger.error(f"❌ [chat_agent] Recommendation generation error: {e}")
+        logger.error(f"❌ [chat_agent] Smart recommendation error: {e}")
 
         # Return error as result
-        error_message = "Sorry, can't give recommendations now. Try searching for something specific!"
+        error_message = "Sorry, I couldn't generate personalized recommendations right now. Try asking for specific genres or authors!"
 
         # Add error message to messages
         state.messages.append(AIMessage(content=error_message))
@@ -272,81 +271,84 @@ async def node_intent(state: ChatAgentState) -> ChatAgentState:
     try:
         # Build router prompt with conversation context
         if context:
-            router_prompt = f"""You are a book search router. Determine the intent for this query using conversation context.
+            router_prompt = f"""You are a book intent classifier. Analyze the user's query carefully to determine their true intent.
 
-SEARCH - if there is ANY search information:
-- Author or book title
-- Genre or topic
-- Publication year or period
-- Plot or content description
-- Book themes and topics
-- Book language
-- ISBN number
-- Any specific details about the book
+🔍 SEARCH - User wants to FIND SPECIFIC books based on concrete criteria:
+- "find books by Stephen King", "show me sci-fi novels"
+- "I'm looking for mystery books from the 90s"
+- "books about artificial intelligence", "history books"
+- Any specific author, title, genre, topic, ISBN, year
+- "What books do you have about X?"
+- References to specific books: "books like 1984", "similar to Harry Potter"
 
-ANALYTICS - if user wants statistics, counts, trends, or analysis:
-- "сколько книг" (how many books)
-- "какие самые популярные" (which are most popular)
-- "статистика по жанрам" (statistics by genres)
-- "топ авторов" (top authors)
-- "тренды" (trends)
-- "подсчитай" (count)
-- "проанализируй" (analyze)
+📊 ANALYTICS - User wants DATA/STATISTICS about the collection:
+- "how many books", "count", "statistics", "analyze"
+- "what genres do you have", "top authors", "most popular"
+- "show me trends", "collection overview"
 
-RECOMMEND - requests for advice and recommendations
+💡 RECOMMEND - User wants PERSONAL SUGGESTIONS and doesn't know what specifically:
+- "recommend something", "what should I read", "suggest books"
+- "I'm bored, what's good", "surprise me", "advise something"
+- "help me choose", "what would you recommend"
+- "I need book recommendations", "give me ideas"
+- No specific criteria - just wants curated suggestions
 
-CLARIFY - only very general queries WITHOUT specifics:
-- "find a book" (without specifying which one)
-- "looking for something to read" (without details)
+❓ CLARIFY - Very vague requests needing more information:
+- "find a book" (no details), "I want to read" (no specifics)
+- "something interesting" (too general)
 
-CHAT - regular conversation not related to book search
+💬 CHAT - Casual conversation not about finding/recommending books:
+- Greetings, personal questions, general chat
 
 CONVERSATION CONTEXT:
 {context}
 
 CURRENT QUERY: "{message_content}"
 
-IMPORTANT:
-- Use conversation context to understand references like "that author", "those books", "more like this"
-- Any genres and topics for finding books - this is SEARCH!
-- Statistics and counting requests - this is ANALYTICS!
-- If user agrees or responds to assistant's previous suggestions, infer intent from context
+ANALYSIS RULES:
+1. If user specifies WHAT they want (genre/author/topic) → SEARCH
+2. If user asks for personal suggestions without specifics → RECOMMEND
+3. If user wants data about collection → ANALYTICS
+4. Context matters: "more like this" after recommendations = SEARCH for similar books
 
 Answer (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
         else:
-            router_prompt = f"""You are a book search router. Determine the intent for this query.
+            router_prompt = f"""You are a book intent classifier. Analyze the user's query carefully to determine their true intent.
 
-SEARCH - if there is ANY search information:
-- Author or book title
-- Genre or topic
-- Publication year or period
-- Plot or content description
-- Book themes and topics
-- Book language
-- ISBN number
-- Any specific details about the book
+🔍 SEARCH - User wants to FIND SPECIFIC books based on concrete criteria:
+- "find books by Stephen King", "show me sci-fi novels"
+- "I'm looking for mystery books from the 90s"
+- "books about artificial intelligence", "history books"
+- Any specific author, title, genre, topic, ISBN, year
+- "What books do you have about X?"
+- References to specific books: "books like 1984", "similar to Harry Potter"
 
-ANALYTICS - if user wants statistics, counts, trends, or analysis:
-- "сколько книг" (how many books)
-- "какие самые популярные" (which are most popular)
-- "статистика по жанрам" (statistics by genres)
-- "топ авторов" (top authors)
-- "тренды" (trends)
-- "подсчитай" (count)
-- "проанализируй" (analyze)
+📊 ANALYTICS - User wants DATA/STATISTICS about the collection:
+- "how many books", "count", "statistics", "analyze"
+- "what genres do you have", "top authors", "most popular"
+- "show me trends", "collection overview"
 
-RECOMMEND - requests for advice and recommendations
+💡 RECOMMEND - User wants PERSONAL SUGGESTIONS and doesn't know what specifically:
+- "recommend something", "what should I read", "suggest books"
+- "I'm bored, what's good", "surprise me", "advise something"
+- "help me choose", "what would you recommend"
+- "I need book recommendations", "give me ideas"
+- No specific criteria - just wants curated suggestions
 
-CLARIFY - only very general queries WITHOUT specifics:
-- "find a book" (without specifying which one)
-- "looking for something to read" (without details)
+❓ CLARIFY - Very vague requests needing more information:
+- "find a book" (no details), "I want to read" (no specifics)
+- "something interesting" (too general)
 
-CHAT - regular conversation not related to book search
+💬 CHAT - Casual conversation not about finding/recommending books:
+- Greetings, personal questions, general chat
 
 Query: "{message_content}"
 
-IMPORTANT: Any genres and topics for finding books - this is SEARCH!
-Statistics and counting requests - this is ANALYTICS!
+ANALYSIS RULES:
+1. If user specifies WHAT they want (genre/author/topic) → SEARCH
+2. If user asks for personal suggestions without specifics → RECOMMEND
+3. If user wants data about collection → ANALYTICS
+
 Answer (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
         
         response = llm.invoke([("user", router_prompt)]).content.strip().upper()
@@ -355,9 +357,37 @@ Answer (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
         
         # Save analysis result in state
         state.intent = response
-        
+
+        # Extract user preferences from chat context if this is a RECOMMEND intent
+        if "RECOMMEND" in response:
+            logger.info("💡 [node_intent] Extracting user preferences from chat context")
+            try:
+                from .smart_recommendation_orchestrator import _extract_user_preferences
+
+                # Convert messages to chat history format for preference extraction
+                chat_history = []
+                for msg in state.messages[:-1]:  # Exclude current message
+                    role = "assistant" if isinstance(msg, AIMessage) else "user"
+                    chat_history.append({"role": role, "content": msg.content})
+
+                # Extract preferences asynchronously
+                extracted_preferences = await _extract_user_preferences(message_content, chat_history)
+                state.user_preferences = extracted_preferences
+
+                logger.info(f"🎯 [node_intent] Extracted preferences: {extracted_preferences}")
+
+            except Exception as e:
+                logger.warning(f"⚠️ [node_intent] Failed to extract preferences: {e}")
+                # Initialize empty preferences if extraction fails
+                state.user_preferences = {
+                    "likes": {"genres": [], "authors": [], "themes": [], "book_types": []},
+                    "dislikes": {"genres": [], "authors": [], "themes": []},
+                    "context": {"mood": "general reading", "situation": "leisure", "goal": "entertainment"},
+                    "recommendation_type": "discovery"
+                }
+
         logger.info(f"✅ [node_intent] Intent determined: '{response}'")
-        
+
         return state
         
     except Exception as e:
@@ -402,8 +432,27 @@ async def node_simple_search(state: ChatAgentState) -> ChatAgentState:
 
         message_content = current_message.content
 
-        # Call simple search
-        search_result = await process_simple_search(state.session_id, message_content)
+        # Extract user preferences from conversation context for preference-aware filtering
+        user_preferences = None
+        if len(state.messages) > 1:
+            try:
+                from .smart_recommendation_orchestrator import _extract_user_preferences
+
+                # Convert messages to chat history format for preference extraction
+                chat_history = []
+                for msg in state.messages[:-1]:  # Exclude current message
+                    role = "assistant" if isinstance(msg, AIMessage) else "user"
+                    chat_history.append({"role": role, "content": msg.content})
+
+                # Extract preferences asynchronously (lightweight for search)
+                user_preferences = await _extract_user_preferences(message_content, chat_history)
+                logger.info(f"🎯 [node_simple_search] Extracted preferences for filtering: {user_preferences}")
+
+            except Exception as e:
+                logger.warning(f"⚠️ [node_simple_search] Failed to extract preferences: {e}")
+
+        # Call simple search with preference context
+        search_result = await process_simple_search(state.session_id, message_content, user_preferences)
 
         # Use ready formatted response from simple_orchestrator
         response_text = search_result.get('response', 'Results not found')

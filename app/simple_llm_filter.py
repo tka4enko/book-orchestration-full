@@ -2,6 +2,8 @@ from typing import List, Dict, Any, Optional
 import logging
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
+from langsmith import traceable
+from langsmith.run_helpers import get_current_run_tree
 from .settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
@@ -17,18 +19,35 @@ class SimpleLLMFilter:
         )
         logger.info("🧠 SimpleLLMFilter initialized")
     
-    async def filter_and_analyze(self, query: str, search_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    @traceable(name="llm_filter_analysis")
+    async def filter_and_analyze(self, query: str, search_results: List[Dict[str, Any]], user_preferences: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Analyzes user query and filters search results
-        
+
         Args:
             query: original user query
             search_results: vector search results
-            
+            user_preferences: optional user preferences for enhanced filtering
+
         Returns:
             Dict with filtered results and analysis metadata
         """
         logger.info(f"🧠 LLM analysis of query: '{query}' for {len(search_results)} results")
+
+        # Add trace metadata
+        current_run = get_current_run_tree()
+        if current_run:
+            current_run.add_tags(["llm_filter", "analysis", "gpt-3.5-turbo"])
+            current_run.add_inputs({
+                "query": query,
+                "num_search_results": len(search_results),
+                "has_user_preferences": user_preferences is not None
+            })
+            current_run.add_metadata({
+                "operation": "filter_and_analyze",
+                "input_count": len(search_results),
+                "query_length": len(query)
+            })
         
         # DEBUG: Show what we received from retriever
         if search_results:
@@ -57,9 +76,9 @@ class SimpleLLMFilter:
             logger.info(f"   Results summary length: {len(results_summary)} chars")
             logger.info(f"   Results summary preview (500 chars): {results_summary[:500]}...")
             
-            # Create prompt
-            system_prompt = self._create_system_prompt()
-            user_prompt = self._create_user_prompt(query, results_summary)
+            # Create prompt with optional user preferences
+            system_prompt = self._create_system_prompt(user_preferences)
+            user_prompt = self._create_user_prompt(query, results_summary, user_preferences)
             
             # Call LLM
             messages = [
@@ -91,9 +110,23 @@ class SimpleLLMFilter:
             logger.info(f"   Filtered: {analysis_result['total_filtered']}/{analysis_result['total_found']}")
             logger.info(f"   Analysis: {analysis_result.get('analysis', 'N/A')}")
             
+            # Update trace with results
+            if current_run:
+                current_run.add_outputs({
+                    "intent": analysis_result['intent'],
+                    "num_filtered": analysis_result['total_filtered'],
+                    "num_total": analysis_result['total_found']
+                })
+                current_run.add_metadata({
+                    "intent_detected": analysis_result['intent'],
+                    "filtered_count": analysis_result['total_filtered'],
+                    "total_count": analysis_result['total_found'],
+                    "filtering_successful": True
+                })
+
             logger.info(f"✅ LLM analysis: intent='{analysis_result['intent']}', "
                        f"filtered={analysis_result['total_filtered']}/{analysis_result['total_found']}")
-            
+
             return analysis_result
             
         except Exception as e:
@@ -107,20 +140,20 @@ class SimpleLLMFilter:
                 "total_filtered": len(search_results)
             }
     
-    def _create_system_prompt(self) -> str:
+    def _create_system_prompt(self, user_preferences: Optional[Dict[str, Any]] = None) -> str:
         """Creates analytical system prompt for filtering"""
-        return """You are a library search filter. Your job is simple: find which books match the user's query.
+        base_prompt = """You are a library search filter. Your job is simple: find which books match the user's query.
 
 FOR ISBN QUERIES (highest priority):
 - If user query contains numbers like "978-12-345-678-9" or "9781234567890"
 - Look for "ISBN:" in each book's content
-- Remove dashes from both: query "978-12-345-678-9" becomes "9781234567890"  
+- Remove dashes from both: query "978-12-345-678-9" becomes "9781234567890"
 - Remove dashes from content: "ISBN: 9781234567890" becomes "9781234567890"
 - If numbers match exactly → INCLUDE that book index in filtered_indices
 
 EXAMPLE:
 Query: "978-12-345-678-9" → digits: "9781234567890"
-Book content: "ISBN: 9781234567890" → digits: "9781234567890"  
+Book content: "ISBN: 9781234567890" → digits: "9781234567890"
 Match found → Return {"filtered_indices": [0], "note": "ISBN match"}
 
 OTHER QUERIES:
@@ -136,22 +169,91 @@ MATCHING CRITERIA:
 - Topic queries: check "Topics: " section in Content preview
 - For multi-criteria: ALL specified elements must match
 
-PRINCIPLE: Balance accuracy with helpfulness. Include books that are reasonably related to the query theme, even if not exact matches. Consider semantic similarity scores and related concepts. Higher similarity scores (>0.3) suggest stronger relevance.
+PRINCIPLE: Balance accuracy with helpfulness. Include books that are reasonably related to the query theme, even if not exact matches. Consider semantic similarity scores and related concepts. Higher similarity scores (>0.3) suggest stronger relevance."""
+
+        # Add user preferences section if available
+        if user_preferences:
+            preferences_section = self._format_preferences_for_prompt(user_preferences)
+            if preferences_section:
+                base_prompt += f"\n\nUSER PREFERENCES (consider for ranking and filtering):\n{preferences_section}"
+
+        base_prompt += """
 
 RESPONSE FORMAT:
 {
   "filtered_indices": [indices after strict analysis],
   "note": "analytical justification of decision"
 }"""
+        return base_prompt
 
-    def _create_user_prompt(self, query: str, results_summary: str) -> str:
+    def _create_user_prompt(self, query: str, results_summary: str, user_preferences: Optional[Dict[str, Any]] = None) -> str:
         """Creates user prompt with query and results"""
-        return f"""Query: "{query}"
+        prompt = f"""Query: "{query}"
 
 Results:
 {results_summary}
 
 Select suitable books."""
+
+        # Add context about user preferences if available
+        if user_preferences:
+            context = self._extract_preference_context(user_preferences)
+            if context:
+                prompt += f"\n\nContext: {context}"
+
+        return prompt
+
+    def _format_preferences_for_prompt(self, user_preferences: Dict[str, Any]) -> str:
+        """Format user preferences for inclusion in system prompt"""
+        try:
+            preferences_lines = []
+
+            likes = user_preferences.get("likes", {})
+            dislikes = user_preferences.get("dislikes", {})
+            context = user_preferences.get("context", {})
+
+            # Add liked genres/authors/themes
+            if likes.get("genres"):
+                preferences_lines.append(f"- Prefers genres: {', '.join(likes['genres'])}")
+            if likes.get("authors"):
+                preferences_lines.append(f"- Prefers authors: {', '.join(likes['authors'])}")
+            if likes.get("themes"):
+                preferences_lines.append(f"- Interested in themes: {', '.join(likes['themes'])}")
+
+            # Add dislikes
+            if dislikes.get("genres"):
+                preferences_lines.append(f"- Dislikes genres: {', '.join(dislikes['genres'])}")
+            if dislikes.get("authors"):
+                preferences_lines.append(f"- Dislikes authors: {', '.join(dislikes['authors'])}")
+
+            # Add context
+            if context.get("mood"):
+                preferences_lines.append(f"- Current mood: {context['mood']}")
+            if context.get("goal"):
+                preferences_lines.append(f"- Reading goal: {context['goal']}")
+
+            return "\n".join(preferences_lines) if preferences_lines else ""
+
+        except Exception as e:
+            logger.warning(f"⚠️ Error formatting preferences: {e}")
+            return ""
+
+    def _extract_preference_context(self, user_preferences: Dict[str, Any]) -> str:
+        """Extract brief context from user preferences for user prompt"""
+        try:
+            context_parts = []
+
+            context = user_preferences.get("context", {})
+            if context.get("mood") and context["mood"] != "general reading":
+                context_parts.append(f"user wants {context['mood']}")
+            if context.get("goal") and context["goal"] != "entertainment":
+                context_parts.append(f"goal is {context['goal']}")
+
+            return ", ".join(context_parts) if context_parts else ""
+
+        except Exception as e:
+            logger.warning(f"⚠️ Error extracting preference context: {e}")
+            return ""
 
     def _prepare_results_for_llm(self, search_results: List[Dict[str, Any]]) -> str:
         """Prepares search results for passing to LLM"""

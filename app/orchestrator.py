@@ -215,9 +215,11 @@ For year_range intent, use filters like: {"year_from": 2020, "year_to": 2024} or
 Be strict: do not invent values."""
 
 def node_detect_intent(state: ChatState) -> ChatState:
+    import uuid
+    node_id = uuid.uuid4().hex[:8]
     start_time = time.time()
-    
-    logger.info("🧠 [orchestrator.py] node_detect_intent - Analyzing user intent...")
+
+    logger.info(f"🧠 [orchestrator.py] [{node_id}] node_detect_intent - Analyzing user intent...")
     logger.info(f"    Purpose: Determine what user wants (ISBN, author/title, genre, etc.)")
     logger.info(f"    Input: '{state.message}'")
     
@@ -646,9 +648,11 @@ def _apply_year_filters(state: ChatState, payload: List[Dict]) -> List[Dict]:
     return filtered_results
 
 def node_route_search(state: ChatState) -> ChatState:
+    import uuid
+    node_id = uuid.uuid4().hex[:8]
     start_time = time.time()
-    
-    logger.info("🔍 [orchestrator.py] node_route_search - Searching for relevant documents...")
+
+    logger.info(f"🔍 [orchestrator.py] [{node_id}] node_route_search - Searching for relevant documents...")
     logger.info(f"    Purpose: Find books based on detected intent '{state.intent}'")
     logger.info(f"    Filters: {state.filters}")
     logger.info(f"    Exclude filters: {state.exclude_filters}")

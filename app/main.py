@@ -117,21 +117,23 @@ def chat_agent_page():
 @app.post("/chat")
 def chat(body: ChatIn):
     import time
+    import uuid
     start_time = time.time()
-    
+    request_id = uuid.uuid4().hex[:8]
+
     logger.info("=" * 80)
-    logger.info(f"🔥 CHAT REQUEST STARTED")
+    logger.info(f"🔥 CHAT REQUEST STARTED [ID: {request_id}]")
     logger.info(f"   Session: {body.session_id}")
     logger.info(f"   Query: '{body.message}'")
     logger.info("=" * 80)
     
     try:
         state = ChatState(session_id=body.session_id, message=body.message)
-        logger.info("📋 [main.py] Creating ChatState and invoking LangGraph...")
-        
+        logger.info(f"📋 [main.py] [{request_id}] Creating ChatState and invoking LangGraph...")
+
         out = graph.invoke(state)
-        
-        logger.info("✅ [main.py] LangGraph execution completed")
+
+        logger.info(f"✅ [main.py] [{request_id}] LangGraph execution completed")
         
         # Finalize debug session here - at the very end of request
         from .debug_reporter import finalize_debug
@@ -176,9 +178,9 @@ def chat(body: ChatIn):
                 payload["search_metrics"] = out.search_metrics
                 logger.info(f"📊 [main.py] Search metrics: {out.search_metrics}")
                     
-            logger.info(f"📤 [main.py] Response prepared with {len(payload.get('results', []))} results")
+            logger.info(f"📤 [main.py] [{request_id}] Response prepared with {len(payload.get('results', []))} results")
             logger.info("=" * 80)
-            logger.info("🎉 CHAT REQUEST COMPLETED SUCCESSFULLY")
+            logger.info(f"🎉 CHAT REQUEST COMPLETED SUCCESSFULLY [ID: {request_id}]")
             logger.info("=" * 80)
             return JSONResponse(payload)
             
