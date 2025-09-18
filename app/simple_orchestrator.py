@@ -54,8 +54,12 @@ async def search_step(state: SimpleSearchState) -> SimpleSearchState:
     start_time = time.time()
     
     try:
-        # Execute async search directly
-        search_results = await simple_retriever.search(state.message, k=5)
+        # Expand search query with preferences if available
+        expanded_query = _expand_query_with_preferences(state.message, state.user_preferences)
+        logger.info(f"🔍 [search_expansion] Original: '{state.message}' → Expanded: '{expanded_query}'")
+
+        # Execute async search with expanded query
+        search_results = await simple_retriever.search(expanded_query, k=10)  # More results for better filtering
         
         state.search_results = search_results
         state.performance_metrics['search_time'] = time.time() - start_time
@@ -127,42 +131,65 @@ async def _execute_llm_filtering(query: str, search_results: List[Dict[str, Any]
             "total_filtered": len(search_results)
         }
 
+
+def _expand_query_with_preferences(original_query: str, user_preferences: Optional[Dict[str, Any]] = None) -> str:
+    """Expand search query with extracted preferences for broader similarity search."""
+    if not user_preferences:
+        return original_query
+
+    likes = user_preferences.get("likes", {})
+    expansion_terms = []
+
+    # Add genres
+    genres = likes.get("genres", [])
+    if genres:
+        expansion_terms.extend(genres)
+
+    # Add themes
+    themes = likes.get("themes", [])
+    if themes:
+        expansion_terms.extend(themes)
+
+    # Add authors
+    authors = likes.get("authors", [])
+    if authors:
+        expansion_terms.extend(authors)
+
+    if expansion_terms:
+        # Combine original query with preference terms
+        expanded = f"{original_query} {' '.join(expansion_terms)}"
+        return expanded.strip()
+
+    return original_query
+
 def _create_filter_system_prompt(user_preferences: Optional[Dict[str, Any]] = None) -> str:
     """Creates analytical system prompt for filtering"""
-    base_prompt = """You are a library search filter. Your job is simple: find which books match the user's query.
+    base_prompt = """# ROLE
+You are a precision library search filter responsible for accurate book matching.
 
-FOR ISBN QUERIES (highest priority):
-- If user query contains numbers like "978-12-345-678-9" or "9781234567890"
-- Look for "ISBN:" in each book's content
-- Remove dashes from both: query "978-12-345-678-9" becomes "9781234567890"
-- Remove dashes from content: "ISBN: 9781234567890" becomes "9781234567890"
-- If numbers match exactly → INCLUDE that book index in filtered_indices
+# TASK
+Analyze the provided books and return only those that match ALL criteria in the user's query.
 
-EXAMPLE:
-Query: "978-12-345-678-9" → digits: "9781234567890"
-Book content: "ISBN: 9781234567890" → digits: "9781234567890"
-Match found → Return {"filtered_indices": [0], "note": "ISBN match"}
+# CONTEXT
+You will receive:
+- A user search query
+- List of books with metadata: Title, Author, Year, Genre, ISBN, Topics, Mentioned topics
 
-OTHER QUERIES:
-- Author: match "Author:" section
-- Title: match book title
-- Topic: match "Topics:" section
+# CRITICAL CONSTRAINTS
+- Use ONLY the exact metadata provided - never modify any data
+- For multi-element queries: Use AND logic - ALL elements must match the SAME book
+- Query "title genre" means: find books with BOTH that title AND that genre
+- Query "author topic" means: find books by BOTH that author AND with that topic
+- Partial matches are FORBIDDEN - exclude books missing any criteria
+- Data integrity is absolute - preserve exact titles, authors, genres
+- Empty results are acceptable when no books satisfy all requirements
 
-MATCHING CRITERIA:
-- ISBN queries: if ISBN found in Content preview → INCLUDE automatically
-- Author queries: check "Author: " section in Content preview
-- Title queries: check book title at start of Content preview
-- Genre queries: check "Genre: " section in Content preview
-- Topic queries: check "Topics: " section in Content preview
-- For multi-criteria: ALL specified elements must match
+# OUTPUT FORMAT
+Return JSON with filtered_indices array and analytical note explaining your decision process.
 
-PRINCIPLE: Balance accuracy with helpfulness. Include books that are reasonably related to the query theme, even if not exact matches. Consider semantic similarity scores and related concepts. Higher similarity scores (>0.3) suggest stronger relevance."""
+Remember: Precision over quantity. Better zero results than incorrect matches."""
 
-    # Add user preferences section if available
-    if user_preferences:
-        preferences_section = _format_preferences_for_prompt(user_preferences)
-        if preferences_section:
-            base_prompt += f"\n\nUSER PREFERENCES (consider for ranking and filtering):\n{preferences_section}"
+    # No user preferences in filter - only strict query matching
 
     base_prompt += """
 
