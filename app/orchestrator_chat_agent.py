@@ -153,6 +153,62 @@ def _smart_preference_update(
             return extracted_preferences
 
 
+async def _generate_smart_clarification(message_content: str, state: ChatAgentState) -> str:
+    """Generate intelligent clarification questions based on available metadata"""
+    try:
+        # Get available metadata for context-aware clarification
+        from .simple_retriever import simple_retriever
+        available_books = await simple_retriever._get_all_books_metadata()
+
+        # Extract unique metadata values for intelligent suggestions
+        authors = set()
+        genres = set()
+        topics = set()
+        years = set()
+
+        for book in available_books[:50]:  # Sample for performance
+            if book.get("author"):
+                authors.add(book["author"])
+            if book.get("primary_genre"):
+                genres.add(book["primary_genre"])
+            if book.get("topics"):
+                topics.update(book["topics"][:3])  # First 3 topics
+            if book.get("year"):
+                years.add(str(book["year"]))
+
+        # Create metadata context for LLM
+        metadata_context = {
+            "sample_authors": list(authors)[:10],
+            "available_genres": list(genres)[:10],
+            "popular_topics": list(topics)[:10],
+            "year_range": f"{min(years) if years else 'N/A'} - {max(years) if years else 'N/A'}"
+        }
+
+        clarification_prompt = f"""You are a helpful librarian assistant. The user said: "{message_content}"
+
+This query is unclear or too vague. Generate a helpful clarification question that guides the user to be more specific.
+
+AVAILABLE METADATA:
+- Authors: {', '.join(metadata_context['sample_authors'])}
+- Genres: {', '.join(metadata_context['available_genres'])}
+- Topics: {', '.join(metadata_context['popular_topics'])}
+- Years: {metadata_context['year_range']}
+
+Generate a friendly clarification question that:
+1. Acknowledges their request
+2. Offers specific options based on available metadata
+3. Helps them narrow down their search
+
+Be conversational and helpful. Suggest concrete options they can choose from."""
+
+        response = llm.invoke([("user", clarification_prompt)])
+        return response.content.strip()
+
+    except Exception as e:
+        logger.error(f"❌ Error generating smart clarification: {e}")
+        return "I'd love to help you find books! Could you be more specific about what you're looking for? You can mention author names, genres, or topics that interest you."
+
+
 def _format_chat_history(history: List[Dict[str, str]]) -> str:
     """Formats chat history for prompt"""
     if not history:
@@ -409,17 +465,15 @@ async def node_intent(state: ChatAgentState) -> ChatAgentState:
 - "What books do you have about X?"
 - References to specific books: "books like 1984", "similar to Harry Potter"
 
-📊 ANALYTICS - User wants DATA/STATISTICS about the collection:
-- "how many books", "count", "statistics", "analyze"
-- "what genres do you have", "top authors", "most popular"
-- "show me trends", "collection overview"
+📊 ANALYTICS - User asks about LIBRARY METADATA (what exists in collection):
+- Questions starting with "what genres/authors/topics do you have"
+- Requests for information ABOUT the database content
+- Meta-information queries about collection statistics
 
-💡 RECOMMEND - User wants PERSONAL SUGGESTIONS and doesn't know what specifically:
-- "recommend something", "what should I read", "suggest books"
-- "I'm bored, what's good", "surprise me", "advise something"
-- "help me choose", "what would you recommend"
-- "I need book recommendations", "give me ideas"
-- No specific criteria - just wants curated suggestions
+💡 RECOMMEND - User wants PERSONAL book suggestions:
+- Asks for book recommendations or suggestions
+- Wants personal advice on what to read
+- Seeking curated suggestions without specific criteria
 
 ❓ CLARIFY - Very vague requests needing more information:
 - "find a book" (no details), "I want to read" (no specifics)
@@ -656,11 +710,11 @@ async def node_analytics(state: ChatAgentState) -> ChatAgentState:
 
         return state
 
-def node_clarify(state: ChatAgentState) -> ChatAgentState:
-    """Requests clarification from user"""
+async def node_clarify(state: ChatAgentState) -> ChatAgentState:
+    """Intelligent clarification using metadata analysis"""
     start_time = time.time()
 
-    logger.info("❓ [chat_agent] node_clarify - Clarification request...")
+    logger.info("❓ [chat_agent] node_clarify - Intelligent clarification request...")
 
     # Get current message content
     current_message = state.messages[-1] if state.messages else None
@@ -671,15 +725,10 @@ def node_clarify(state: ChatAgentState) -> ChatAgentState:
     message_content = current_message.content
 
     try:
-        # Form response with clarification request
-        message_lower = message_content.lower()
-        
-        if any(word in message_lower for word in ["найти", "найду", "ищу", "поиск"]):  # Russian: найти=find, найду=will find, ищу=searching, поиск=search
-            reply = "What exactly do you want to find? Specify author, book title or genre."
-        elif any(word in message_lower for word in ["книг", "читать", "литератур"]):  # Russian: книг=books, читать=read, литератур=literature
-            reply = "What type of books interest you? You can specify genre or specific preferences."
-        else:
-            reply = "I can help find books! What exactly interests you?"
+        # Get metadata for intelligent clarification
+        reply = await _generate_smart_clarification(message_content, state)
+
+        logger.info(f"🤖 [node_clarify] Generated clarification: {reply}")
         
         # Add AI response to messages (standard LangGraph approach)
         state.messages.append(AIMessage(content=reply))
