@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
+from langsmith import traceable
 
 from .settings import OPENAI_API_KEY, OPENAI_MODEL_CHAT
 from .simple_retriever import SimpleVectorRetriever
@@ -24,43 +25,40 @@ _recommendation_llm = ChatOpenAI(
 )
 
 # Recommendation prompts and configurations
-PREFERENCE_EXTRACTION_PROMPT = """You are an expert at understanding user preferences from conversation context.
+PREFERENCE_EXTRACTION_PROMPT = """You are an intelligent conversation analyst. Extract what the user wants right now.
 
-Analyze the conversation history and extract user preferences and dislikes about books.
-
-EXTRACT:
-1. LIKES: Genres, authors, themes, book types user shows interest in
-2. DISLIKES: What user explicitly doesn't want or shows negative sentiment toward
-3. CONTEXT: Current mood, situation, reading goals mentioned
+Analyze ONLY user messages. Ignore all assistant responses completely.
 
 CONVERSATION HISTORY:
 {chat_history}
 
 CURRENT REQUEST: {current_message}
 
-Return JSON:
+Extract the user's preferences from their current request. Each new request represents their current interests - do not combine with previous requests unless they explicitly say "more" or "also".
+
+Return only what the user wants now as valid JSON:
 {{
     "likes": {{
-        "genres": ["genre1", "genre2"],
-        "authors": ["author1", "author2"],
-        "themes": ["theme1", "theme2"],
-        "book_types": ["fiction", "non-fiction", "classics"]
+        "genres": [],
+        "authors": [],
+        "themes": [],
+        "book_types": []
     }},
     "dislikes": {{
-        "genres": ["disliked_genre"],
-        "authors": ["disliked_author"],
-        "themes": ["theme_to_avoid"]
+        "genres": [],
+        "authors": [],
+        "themes": []
     }},
     "context": {{
-        "mood": "relaxing reading",
-        "situation": "bedtime reading",
-        "goal": "learn something new"
+        "mood": "general reading",
+        "situation": "leisure",
+        "goal": "entertainment"
     }},
-    "recommendation_type": "mood-based|discovery|trending|similar|author-based"
+    "recommendation_type": "discovery"
 }}
 """
 
-SMART_RECOMMENDATION_PROMPT = """You are an expert book curator. You MUST recommend ONLY books from the available database provided below.
+SMART_RECOMMENDATION_PROMPT = """You are an expert book curator. Recommend books that match user preferences from the available database.
 
 USER PREFERENCES:
 {user_preferences}
@@ -72,17 +70,26 @@ BOOKS TO EXCLUDE (already seen/mentioned):
 {exclude_books}
 
 CRITICAL RULES:
-1. You can ONLY recommend books that appear in the "AVAILABLE BOOKS IN DATABASE" list above
+1. Recommend books that match user preferences from the available database
 2. DO NOT invent or hallucinate book titles or authors that are not in the provided list
-3. Select 3-5 books maximum from the available list that best match user preferences
+3. Prioritize preference matching over quantity
 4. Skip books that appear in the "exclude" list
-5. If no suitable books are found in the database, return empty recommendations list
+5. BE HONEST: If no matching books are found, return empty recommendations list
+
+STRICT MATCHING CRITERIA:
+- For genre preferences: book's primary_genre or all_genres must contain exact match
+- For theme preferences: book's topics must contain similar themes
+- NO creative interpretation or forced connections
+- If no exact/similar matches found → return empty array
+- Quality over quantity - recommend only what truly fits
+- Empty recommendations are acceptable and honest when appropriate
 
 SELECTION CRITERIA:
-- Match user's preferred genres, authors, themes from available books
+- IF user has specific preferences → match preferred genres, authors, themes
+- IF user has no specific preferences (empty arrays) → provide diverse discovery selection
 - Avoid user's dislikes if specified
 - Provide variety when possible
-- Include reasoning based on user preferences and book metadata
+- Include reasoning based on ACTUAL user preferences (not invented ones)
 
 Return JSON (use exact titles and authors from the provided database):
 {{
@@ -91,14 +98,28 @@ Return JSON (use exact titles and authors from the provided database):
             "title": "EXACT_TITLE_FROM_DATABASE",
             "author": "EXACT_AUTHOR_FROM_DATABASE",
             "genre": "primary_genre_from_database",
-            "reasoning": "Why this specific book from our database fits user preferences (reference genres, topics, summary)",
+            "reasoning": "Why this book was selected - reference book's actual qualities, NOT invented user preferences",
             "confidence": 0.9
         }}
     ],
-    "summary": "Explanation of selection strategy based on available database books and user preferences"
+    "summary": "Specific explanation of why these books were selected from our database based on ACTUAL user preferences or book qualities. For users with no preferences: 'Selected diverse high-quality books including classic literature and modern fiction with engaging themes.' For users with specific preferences: 'Selected sci-fi books that match your stated interest in space exploration and dystopian themes.' DO NOT mention authors not in the database."
 }}
 
-IMPORTANT: Use the exact "title" and "author" fields from the database entries above. Pay attention to the "summary", "topics", and "all_genres" fields to make better matches with user preferences.
+CRITICAL REASONING RULES:
+1. Use the exact "title" and "author" fields from the database entries above
+2. Pay attention to the "summary", "topics", and "all_genres" fields to make better matches with user preferences
+3. In the "summary" field, NEVER mention authors like "Agatha Christie", "J.K. Rowling" or any other authors that are NOT in the provided database
+4. Base your explanation ONLY on the actual books and authors present in the database list above
+
+REASONING FOR EMPTY PREFERENCES:
+- IF user preferences are empty/minimal → reasoning should focus on book's intrinsic qualities
+- Example: "Classic dystopian novel exploring surveillance and freedom themes"
+- NOT: "matches user's preference for dystopian fiction" (when user never said they prefer dystopian)
+- Focus on: book quality, interesting themes, well-regarded author, diverse selection
+
+REASONING FOR SPECIFIC PREFERENCES:
+- IF user has clear preferences → reference those specific preferences
+- Example: "Matches your interest in sci-fi and space exploration themes"
 """
 
 
@@ -115,10 +136,11 @@ async def process_smart_recommendations(
     total_start = time.time()
 
     try:
-        # Step 1: Extract/update user preferences from chat context
+        # Step 1: Use provided user preferences (extracted in node_recommendations)
         preferences_start = time.time()
         if not user_preferences:
-            user_preferences = await _extract_user_preferences(current_message, chat_history)
+            logger.warning("⚠️ [smart_recommendations] No user preferences provided, using defaults")
+            user_preferences = _get_default_preferences()
         preferences_time = time.time() - preferences_start
 
         # Step 2: Get available books data
@@ -128,6 +150,7 @@ async def process_smart_recommendations(
 
         # Step 3: Generate smart recommendations
         rec_start = time.time()
+        logger.info("🎯 [smart_recommendations] Passing preferences to LLM: %s", user_preferences)
         recommendations = await _generate_recommendations(
             user_preferences, books_data, exclude_books or set()
         )
@@ -167,6 +190,7 @@ async def process_smart_recommendations(
         }
 
 
+@traceable(name="extract_user_preferences")
 async def _extract_user_preferences(
     current_message: str, chat_history: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
@@ -177,10 +201,12 @@ async def _extract_user_preferences(
         if chat_history:
             recent_history = chat_history[-10:]  # Last 10 messages
             history_lines = []
-            for entry in recent_history:
+            for i, entry in enumerate(recent_history):
                 role = entry.get("role", "user")
                 content = entry.get("content", "")
-                history_lines.append(f"{role}: {content}")
+                # Add simple chronological marker
+                timestamp = f"[{i+1:02d}]"
+                history_lines.append(f"{timestamp} {role}: {content}")
             history_text = "\n".join(history_lines)
 
         prompt = PREFERENCE_EXTRACTION_PROMPT.format(
@@ -206,7 +232,7 @@ async def _extract_user_preferences(
         logger.error("❌ [preferences] Extraction failed: %s", e)
         return _get_default_preferences()
 
-
+@traceable(name="get_books_for_recommendations")
 async def _get_books_for_recommendations(
     user_preferences: Dict[str, Any], exclude_books: Set[str]
 ) -> List[Dict[str, Any]]:
@@ -233,6 +259,7 @@ async def _get_books_for_recommendations(
         return []
 
 
+@traceable(name="generate_recommendations")
 async def _generate_recommendations(
     user_preferences: Dict[str, Any],
     books_data: List[Dict[str, Any]],
@@ -313,10 +340,15 @@ async def _generate_recommendations(
                        len(recommendations.get("recommendations", [])),
                        len(validated_recommendations))
 
-            # If no valid recommendations found, use fallback
+            # If no valid recommendations found, check if this was an honest empty response
             if not validated_recommendations:
-                logger.warning("⚠️ [recommendations] No valid recommendations found, using fallback")
-                return _get_fallback_recommendations(books_data, user_preferences)
+                # Check if LLM honestly said there are no suitable books
+                if _is_honest_empty_response(recommendations):
+                    logger.info("✅ [recommendations] LLM honestly reported no suitable books available")
+                    return recommendations  # Respect LLM's honest decision
+                else:
+                    logger.warning("⚠️ [recommendations] No valid recommendations found, FALLBACK DISABLED FOR TESTING")
+                    return recommendations  # Return empty instead of fallback
 
             return recommendations
         except json.JSONDecodeError:
@@ -335,7 +367,21 @@ def _format_recommendation_response(
     try:
         recs = recommendations.get("recommendations", [])
         if not recs:
-            return "I couldn't find suitable recommendations right now. Try being more specific about what you'd like to read!"
+            # Check if user had specific theme/genre preferences
+            likes = user_preferences.get("likes", {})
+            themes = likes.get("themes", [])
+            genres = likes.get("genres", [])
+
+            if themes or genres:
+                criteria = []
+                if themes:
+                    criteria.extend(themes)
+                if genres:
+                    criteria.extend(genres)
+                criteria_text = ", ".join(criteria)
+                return f"I couldn't find any more {criteria_text} books in our database. Try asking for a different genre or theme!"
+            else:
+                return "I couldn't find suitable recommendations right now. Try being more specific about what you'd like to read!"
 
         response_parts = [
             "Here are my personalized recommendations for you:\n"
@@ -349,10 +395,23 @@ def _format_recommendation_response(
             response_parts.append(f"{i}. **{title}** by {author}")
             response_parts.append(f"   _{reasoning}_\n")
 
-        # Add strategy explanation
+        # Add strategy explanation (but avoid showing hallucinated preferences)
         strategy = recommendations.get("summary", "")
         if strategy:
-            response_parts.append(f"My recommendation strategy: {strategy}")
+            # Check if user preferences are mostly empty to avoid showing hallucinated preferences
+            likes = user_preferences.get("likes", {})
+            has_real_preferences = (
+                likes.get("genres") or
+                likes.get("authors") or
+                likes.get("themes") or
+                likes.get("book_types")
+            )
+
+            if has_real_preferences:
+                response_parts.append(f"My recommendation strategy: {strategy}")
+            else:
+                # For users with no explicit preferences, use neutral strategy text
+                response_parts.append("My recommendation strategy: Selected diverse high-quality books with engaging themes and well-regarded authors.")
 
         return "\n".join(response_parts)
 
@@ -414,26 +473,41 @@ def _validate_recommendations(
 
 
 def _get_default_preferences() -> Dict[str, Any]:
-    """Return default preferences when extraction fails."""
+    """Return conservative default preferences - empty arrays to avoid false assumptions."""
     return {
         "likes": {
-            "genres": [],
-            "authors": [],
-            "themes": [],
-            "book_types": []
+            "genres": [],  # Conservative: no assumed preferences
+            "authors": [],  # Conservative: no assumed preferences
+            "themes": [],  # Conservative: no assumed preferences
+            "book_types": []  # Conservative: no assumed preferences
         },
         "dislikes": {
-            "genres": [],
-            "authors": [],
-            "themes": []
+            "genres": [],  # Conservative: no assumed dislikes
+            "authors": [],  # Conservative: no assumed dislikes
+            "themes": []  # Conservative: no assumed dislikes
         },
         "context": {
-            "mood": "general reading",
-            "situation": "leisure",
-            "goal": "entertainment"
+            "mood": "general reading",  # Safe default
+            "situation": "leisure",  # Safe default
+            "goal": "entertainment"  # Safe default
         },
-        "recommendation_type": "discovery"
+        "recommendation_type": "discovery"  # Discovery = exploration, safe default
     }
+
+
+def _is_honest_empty_response(recommendations: Dict[str, Any]) -> bool:
+    """Check if LLM honestly said there are no suitable books."""
+    recs = recommendations.get("recommendations", [])
+    summary = recommendations.get("summary", "").lower()
+
+    # Empty recommendations + summary indicating honest limitation
+    if not recs and any(phrase in summary for phrase in [
+        "no books", "no more", "unfortunately", "not available",
+        "no suitable", "no matching", "database", "sorry"
+    ]):
+        return True
+
+    return False
 
 
 def _get_fallback_recommendations(
@@ -509,7 +583,7 @@ def _get_fallback_recommendations(
 
         return {
             "recommendations": recommendations,
-            "summary": "Curated selection from available books using preference analysis"
+            "summary": "Diverse selection from our book collection for discovery and exploration"
         }
 
     except Exception as e:

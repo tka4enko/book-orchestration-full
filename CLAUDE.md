@@ -158,3 +158,5 @@ Enable detailed logging by checking:
 
 The system uses extensive logging throughout the pipeline to track intent detection, search steps, and result formatting.
 - all code comments promtp should be in English
+- не нужно пропт подгонять под запрос
+- не нужно пропт подгонять под запрос нужен умнаый универсальный промпт

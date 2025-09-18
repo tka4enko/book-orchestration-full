@@ -21,9 +21,18 @@ class ChatAgentState(BaseModel):
 
     # User intent (determined in node_intent)
     intent: Optional[str] = None
+    previous_intent: Optional[str] = None
+    conversation_mode: str = "discovery"
+
+    # Enhanced context tracking for intent determination
+    intent_history: List[str] = Field(default_factory=list)  # Track all intents in order
+    last_successful_mode: Optional[str] = None  # Last mode that provided results
+    conversation_turns: int = 0  # Count of user messages in this session
 
     # User preferences and context tracking
     user_preferences: Dict[str, Any] = Field(default_factory=dict)
+    current_preferences: Optional[Dict[str, Any]] = None  # Latest extracted preferences for "еще" fallback
+    previous_criteria: set = Field(default_factory=set)  # Previous themes/genres for change detection
     seen_books: set = Field(default_factory=set)  # Books mentioned/recommended in this session
 
     # Results (unified for chat and search)
@@ -42,17 +51,119 @@ class ChatAgentState(BaseModel):
 # LLM is used only for recommendations, not for routing
 llm = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0.7, api_key=OPENAI_API_KEY)
 
+async def extract_and_update_preferences(
+    state: ChatAgentState,
+    message_content: str,
+    chat_history: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Universal preference extraction and state update function for both search and recommendations."""
+    try:
+        from .smart_recommendation_orchestrator import _extract_user_preferences
+
+        # Extract preferences using the same LLM and prompt as recommendations
+        extracted_preferences = await _extract_user_preferences(message_content, chat_history)
+
+        # Smart preference update function
+        user_preferences = _smart_preference_update(state, extracted_preferences, message_content)
+
+        # Update state with final preferences
+        state.user_preferences = user_preferences
+        state.current_preferences = user_preferences
+
+        # Check if user changed themes/criteria for filter management
+        current_themes = user_preferences.get("likes", {}).get("themes", [])
+        current_genres = user_preferences.get("likes", {}).get("genres", [])
+        current_criteria = set(current_themes + current_genres)
+
+        # Get previous criteria from state
+        previous_criteria = getattr(state, 'previous_criteria', set())
+
+        # Determine if criteria changed significantly
+        criteria_changed = bool(current_criteria and previous_criteria and not current_criteria.intersection(previous_criteria))
+        should_clear_filters = criteria_changed
+
+        if should_clear_filters:
+            logger.info(f"📝 [extract_preferences] Criteria changed from {previous_criteria} to {current_criteria}, clearing filters")
+            # Clear seen books for new topic
+            if hasattr(state, 'seen_books'):
+                state.seen_books = set()
+
+        # Store current criteria for next comparison
+        state.previous_criteria = current_criteria
+
+        logger.info(f"🎯 [extract_preferences] Final preferences: {user_preferences}")
+
+        return {
+            "user_preferences": user_preferences,
+            "criteria_changed": criteria_changed,
+            "should_clear_filters": should_clear_filters,
+            "current_criteria": current_criteria,
+            "previous_criteria": previous_criteria
+        }
+
+    except Exception as e:
+        logger.error(f"❌ [extract_preferences] Failed: {e}")
+        # Return default preferences on error
+        default_preferences = {
+            "likes": {"genres": [], "authors": [], "themes": [], "book_types": []},
+            "dislikes": {"genres": [], "authors": [], "themes": []},
+            "context": {"mood": "general reading", "situation": "leisure", "goal": "entertainment"},
+            "recommendation_type": "discovery"
+        }
+        state.user_preferences = default_preferences
+
+        return {
+            "user_preferences": default_preferences,
+            "criteria_changed": False,
+            "should_clear_filters": False,
+            "current_criteria": set(),
+            "previous_criteria": set()
+        }
+
+
+def _smart_preference_update(
+    state: ChatAgentState,
+    extracted_preferences: Dict[str, Any],
+    message_content: str
+) -> Dict[str, Any]:
+    """Simply decides whether to use extracted preferences or preserve previous ones."""
+
+    # Check if LLM extracted any meaningful new preferences
+    extracted_likes = extracted_preferences.get("likes", {})
+    has_new_preferences = any([
+        extracted_likes.get("themes"),
+        extracted_likes.get("genres"),
+        extracted_likes.get("authors")
+    ])
+
+    logger.info(f"🔧 [smart_update] Message: '{message_content}'")
+    logger.info(f"🔧 [smart_update] Has new preferences: {has_new_preferences}")
+
+    if has_new_preferences:
+        # New preferences found - use them
+        logger.info(f"🔄 [smart_update] Using new extracted preferences")
+        return extracted_preferences
+    else:
+        # No new preferences - use previous if available
+        if hasattr(state, 'current_preferences') and state.current_preferences:
+            logger.info(f"🔄 [smart_update] No new preferences, using previous")
+            return state.current_preferences
+        else:
+            logger.info(f"🔄 [smart_update] No preferences available, using extracted")
+            return extracted_preferences
+
+
 def _format_chat_history(history: List[Dict[str, str]]) -> str:
     """Formats chat history for prompt"""
     if not history:
         return "Empty history"
-    
+
     formatted = []
     for entry in history[-5:]:  # Last 5 messages
         role = entry.get("role", "user")
         content = entry.get("content", "")
         formatted.append(f"{role}: {content}")
-    
+
     return "\n".join(formatted)
 
 def node_chat_response_simple(state: ChatAgentState) -> ChatAgentState:
@@ -169,6 +280,11 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
                 book_titles = re.findall(r'\*\*(.*?)\*\*', msg.content)
                 seen_books.update(book_titles)
 
+        # Extract user preferences using universal function
+        logger.info("🧠 [node_recommendations] Extracting user preferences from chat context...")
+        pref_result = await extract_and_update_preferences(state, message_content, chat_history)
+        user_preferences = pref_result["user_preferences"]
+
         # Use smart recommendation orchestrator
         from .smart_recommendation_orchestrator import process_smart_recommendations
 
@@ -176,7 +292,7 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
             session_id=state.session_id,
             current_message=message_content,
             chat_history=chat_history,
-            user_preferences=state.user_preferences if hasattr(state, 'user_preferences') else None,
+            user_preferences=user_preferences,
             exclude_books=seen_books
         )
 
@@ -217,6 +333,10 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
         execution_time = (time.time() - start_time) * 1000
         state.performance_metrics["recommendations_ms"] = execution_time
 
+        # Update last successful mode for context tracking
+        if recommendations:
+            state.last_successful_mode = "RECOMMEND"
+
         logger.info(f"✅ [chat_agent] Smart recommendations generated in {execution_time:.1f}ms")
         logger.info(f"📊 [chat_agent] Generated {len(recommendations)} recommendations")
 
@@ -253,9 +373,18 @@ async def node_intent(state: ChatAgentState) -> ChatAgentState:
 
     message_content = current_message.content
 
+    # Count conversation turns (user messages only)
+    user_message_count = sum(1 for msg in state.messages if isinstance(msg, HumanMessage))
+    state.conversation_turns = user_message_count
+
     logger.info(f"🧠 [node_intent] Intent analysis: '{message_content}'")
     logger.info(f"📜 [node_intent] Message history: {len(state.messages)} messages")
     logger.info(f"🆔 [node_intent] Session ID: {state.session_id}")
+    logger.info(f"🔄 [node_intent] Previous intent: {state.previous_intent}")
+    logger.info(f"🎯 [node_intent] Conversation mode: {state.conversation_mode}")
+    logger.info(f"📊 [node_intent] Intent history: {state.intent_history}")
+    logger.info(f"🔗 [node_intent] Conversation turns: {state.conversation_turns}")
+    logger.info(f"✅ [node_intent] Last successful mode: {state.last_successful_mode}")
 
     # Format conversation context from messages
     context = ""
@@ -269,9 +398,8 @@ async def node_intent(state: ChatAgentState) -> ChatAgentState:
         context = "\n".join(context_lines)
     
     try:
-        # Build router prompt with conversation context
-        if context:
-            router_prompt = f"""You are a book intent classifier. Analyze the user's query carefully to determine their true intent.
+        # Universal context-aware intent prompt
+        router_prompt = f"""You are an intelligent book intent classifier. Analyze the user's current query within the conversation context to determine their true intent.
 
 🔍 SEARCH - User wants to FIND SPECIFIC books based on concrete criteria:
 - "find books by Stephen King", "show me sci-fi novels"
@@ -301,90 +429,59 @@ async def node_intent(state: ChatAgentState) -> ChatAgentState:
 - Greetings, personal questions, general chat
 
 CONVERSATION CONTEXT:
-{context}
+Previous Intent: {state.previous_intent or "None"}
+Intent History: {" → ".join(state.intent_history[-3:]) if state.intent_history else "None"} (last 3)
+Conversation Mode: {state.conversation_mode}
+Conversation Turns: {state.conversation_turns}
+Last Successful Mode: {state.last_successful_mode or "None"}
+Recent Messages:
+{context if context else "No previous context"}
 
 CURRENT QUERY: "{message_content}"
 
-ANALYSIS RULES:
-1. If user specifies WHAT they want (genre/author/topic) → SEARCH
-2. If user asks for personal suggestions without specifics → RECOMMEND
-3. If user wants data about collection → ANALYTICS
-4. Context matters: "more like this" after recommendations = SEARCH for similar books
+CONTEXT-AWARE ANALYSIS RULES:
+1. CONTINUITY: If query is ambiguous (like "еще", "а теперь антиутопию", "что-то другое"), consider previous intent:
+   - If previous was RECOMMEND → stay in RECOMMEND unless user explicitly asks for specific search
+   - If previous was SEARCH → stay in SEARCH unless user asks for general suggestions
 
-Answer (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
-        else:
-            router_prompt = f"""You are a book intent classifier. Analyze the user's query carefully to determine their true intent.
+2. GENRE MENTIONS: Analyze how genres are mentioned:
+   - "посоветуй антиутопию" = RECOMMEND (asking for suggestions in dystopian genre)
+   - "найди антиутопию" = SEARCH (looking for specific dystopian books)
+   - "покажи фантастику" = SEARCH (show me sci-fi books)
+   - "что почитать из фантастики" = RECOMMEND (what to read from sci-fi)
 
-🔍 SEARCH - User wants to FIND SPECIFIC books based on concrete criteria:
-- "find books by Stephen King", "show me sci-fi novels"
-- "I'm looking for mystery books from the 90s"
-- "books about artificial intelligence", "history books"
-- Any specific author, title, genre, topic, ISBN, year
-- "What books do you have about X?"
-- References to specific books: "books like 1984", "similar to Harry Potter"
+3. CONTEXT FLOW: Consider conversation progression:
+   - After recommendations, "еще" usually means "more recommendations"
+   - After search results, "что-то другое" might mean "different search" or "switch to recommendations"
+   - "а теперь X" often continues in same mode but changes criteria
 
-📊 ANALYTICS - User wants DATA/STATISTICS about the collection:
-- "how many books", "count", "statistics", "analyze"
-- "what genres do you have", "top authors", "most popular"
-- "show me trends", "collection overview"
+4. IMPLICIT INTENT: Use conversation intelligence:
+   - If user established preferences in recommendations, ambiguous follow-ups likely stay in RECOMMEND
+   - If user was searching specific criteria, ambiguous follow-ups likely modify search
+   - Context clues are more important than literal word matching
 
-💡 RECOMMEND - User wants PERSONAL SUGGESTIONS and doesn't know what specifically:
-- "recommend something", "what should I read", "suggest books"
-- "I'm bored, what's good", "surprise me", "advise something"
-- "help me choose", "what would you recommend"
-- "I need book recommendations", "give me ideas"
-- No specific criteria - just wants curated suggestions
+5. FALLBACK LOGIC: When truly ambiguous, prefer previous intent over default routing
 
-❓ CLARIFY - Very vague requests needing more information:
-- "find a book" (no details), "I want to read" (no specifics)
-- "something interesting" (too general)
-
-💬 CHAT - Casual conversation not about finding/recommending books:
-- Greetings, personal questions, general chat
-
-Query: "{message_content}"
-
-ANALYSIS RULES:
-1. If user specifies WHAT they want (genre/author/topic) → SEARCH
-2. If user asks for personal suggestions without specifics → RECOMMEND
-3. If user wants data about collection → ANALYTICS
-
-Answer (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
+Answer only the intent (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
         
         response = llm.invoke([("user", router_prompt)]).content.strip().upper()
-        
+
         logger.info(f"🧠 [router] LLM response: '{response}'")
-        
+
+        # Save previous intent before updating
+        state.previous_intent = state.intent
+
+        # Track intent in history
+        if response and response not in ["CHAT", "CLARIFY"]:
+            state.intent_history.append(response)
+            # Keep only last 10 intents to avoid memory bloat
+            if len(state.intent_history) > 10:
+                state.intent_history = state.intent_history[-10:]
+
         # Save analysis result in state
         state.intent = response
 
-        # Extract user preferences from chat context if this is a RECOMMEND intent
-        if "RECOMMEND" in response:
-            logger.info("💡 [node_intent] Extracting user preferences from chat context")
-            try:
-                from .smart_recommendation_orchestrator import _extract_user_preferences
-
-                # Convert messages to chat history format for preference extraction
-                chat_history = []
-                for msg in state.messages[:-1]:  # Exclude current message
-                    role = "assistant" if isinstance(msg, AIMessage) else "user"
-                    chat_history.append({"role": role, "content": msg.content})
-
-                # Extract preferences asynchronously
-                extracted_preferences = await _extract_user_preferences(message_content, chat_history)
-                state.user_preferences = extracted_preferences
-
-                logger.info(f"🎯 [node_intent] Extracted preferences: {extracted_preferences}")
-
-            except Exception as e:
-                logger.warning(f"⚠️ [node_intent] Failed to extract preferences: {e}")
-                # Initialize empty preferences if extraction fails
-                state.user_preferences = {
-                    "likes": {"genres": [], "authors": [], "themes": [], "book_types": []},
-                    "dislikes": {"genres": [], "authors": [], "themes": []},
-                    "context": {"mood": "general reading", "situation": "leisure", "goal": "entertainment"},
-                    "recommendation_type": "discovery"
-                }
+        # Note: User preferences will be extracted in node_recommendations if needed
 
         logger.info(f"✅ [node_intent] Intent determined: '{response}'")
 
@@ -432,24 +529,15 @@ async def node_simple_search(state: ChatAgentState) -> ChatAgentState:
 
         message_content = current_message.content
 
-        # Extract user preferences from conversation context for preference-aware filtering
-        user_preferences = None
-        if len(state.messages) > 1:
-            try:
-                from .smart_recommendation_orchestrator import _extract_user_preferences
+        # Extract user preferences using universal function
+        chat_history = []
+        for msg in state.messages[:-1]:  # Exclude current message
+            role = "assistant" if isinstance(msg, AIMessage) else "user"
+            chat_history.append({"role": role, "content": msg.content})
 
-                # Convert messages to chat history format for preference extraction
-                chat_history = []
-                for msg in state.messages[:-1]:  # Exclude current message
-                    role = "assistant" if isinstance(msg, AIMessage) else "user"
-                    chat_history.append({"role": role, "content": msg.content})
-
-                # Extract preferences asynchronously (lightweight for search)
-                user_preferences = await _extract_user_preferences(message_content, chat_history)
-                logger.info(f"🎯 [node_simple_search] Extracted preferences for filtering: {user_preferences}")
-
-            except Exception as e:
-                logger.warning(f"⚠️ [node_simple_search] Failed to extract preferences: {e}")
+        pref_result = await extract_and_update_preferences(state, message_content, chat_history)
+        user_preferences = pref_result["user_preferences"]
+        logger.info(f"🎯 [node_simple_search] Using preferences for filtering: {user_preferences}")
 
         # Call simple search with preference context
         search_result = await process_simple_search(state.session_id, message_content, user_preferences)
@@ -475,6 +563,10 @@ async def node_simple_search(state: ChatAgentState) -> ChatAgentState:
 
         execution_time = (time.time() - start_time) * 1000
         state.performance_metrics["simple_search_ms"] = execution_time
+
+        # Update last successful mode for context tracking
+        if state.results and state.results[0].get("raw_results"):
+            state.last_successful_mode = "SEARCH"
 
         logger.info(f"✅ [chat_agent] Simple search completed in {execution_time:.1f}ms")
 
