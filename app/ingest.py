@@ -142,7 +142,8 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
         base = {**llm_meta, **base}
         logger.info(f"✅ Stage 1 completed: {llm_meta.get('title', 'Unknown title')}")
         if DEBUG_INGEST_STAGES:
-            logger.info(f"🔬 DEBUG: Stage 1 result - Title: {llm_meta.get('title')}, Author: {llm_meta.get('author')}, Summary length: {len(llm_meta.get('summary', ''))}")
+            summary = llm_meta.get('summary') or ''
+            logger.info(f"🔬 DEBUG: Stage 1 result - Title: {llm_meta.get('title')}, Author: {llm_meta.get('author')}, Summary length: {len(summary)}")
     else:
         logger.info(f"📖 SHORT BOOK ({text_length} chars) - Using single-stage analysis")
         if DEBUG_INGEST_STAGES:
@@ -152,7 +153,8 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
         base = {**llm_meta, **base}
         logger.info(f"✅ LLM metadata extracted: {llm_meta.get('title', 'Unknown title')}")
         if DEBUG_INGEST_STAGES:
-            logger.info(f"🔬 DEBUG: Single-stage result - Title: {llm_meta.get('title')}, Author: {llm_meta.get('author')}, Summary length: {len(llm_meta.get('summary', ''))}")
+            summary = llm_meta.get('summary') or ''
+            logger.info(f"🔬 DEBUG: Single-stage result - Title: {llm_meta.get('title')}, Author: {llm_meta.get('author')}, Summary length: {len(summary)}")
 
     logger.info("🔍 Processing ISBN...")
     raw_isbn = base.get("isbn") or base.get("isbn13") or base.get("isbn10")
@@ -416,7 +418,8 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
                 # Update summary if we got a better one
                 if enhanced_meta.get("summary"):
                     if DEBUG_INGEST_STAGES:
-                        logger.info(f"🔬 DEBUG: Updating summary from {len(master_meta.get('summary', ''))} to {len(enhanced_meta['summary'])} chars")
+                        old_summary = master_meta.get('summary') or ''
+                        logger.info(f"🔬 DEBUG: Updating summary from {len(old_summary)} to {len(enhanced_meta['summary'])} chars")
                     master_meta["summary"] = enhanced_meta["summary"]
                     logger.info(f"📝 Updated summary ({len(enhanced_meta['summary'])} chars)")
                 
@@ -572,7 +575,74 @@ def ingest_one(file_path: str, meta_json: Dict | None = None, force_ingest: bool
         "file_path": file_path
     }
 
-def ingest_batch(paths: List[str], metas: List[Dict] | None = None) -> List[Dict]:
-    results, metas = [], (metas or [None]*len(paths))
-    for p, m in zip(paths, metas): results.append(ingest_one(p, m))
-    return results
+def ingest_batch(paths: List[str], metas: List[Dict] | None = None, force_ingest: bool = False) -> Dict:
+    """
+    Batch ingest multiple documents with comprehensive duplicate handling
+
+    Args:
+        paths: List of file paths to ingest
+        metas: Optional list of metadata for each file
+        force_ingest: If True, skip duplicate detection for all files
+
+    Returns:
+        Dict with batch summary: success_count, duplicate_count, error_count, results
+    """
+    logger.info(f"📦 [ingest.py] Starting batch ingestion of {len(paths)} files")
+
+    results = []
+    metas = metas or [None] * len(paths)
+
+    success_count = 0
+    duplicate_count = 0
+    error_count = 0
+
+    for i, (path, meta) in enumerate(zip(paths, metas)):
+        logger.info(f"📄 [{i+1}/{len(paths)}] Processing: {path}")
+
+        try:
+            result = ingest_one(path, meta, force_ingest)
+            results.append(result)
+
+            # Count results by status
+            if result.get("status") == "success":
+                success_count += 1
+                logger.info(f"✅ [{i+1}/{len(paths)}] SUCCESS: {result.get('metadata', {}).get('title', 'Unknown')}")
+            elif result.get("status") == "duplicate_detected":
+                duplicate_count += 1
+                logger.warning(f"🚨 [{i+1}/{len(paths)}] DUPLICATE: {result.get('detected_title', 'Unknown')} - {result.get('message')}")
+            else:
+                error_count += 1
+                logger.error(f"❌ [{i+1}/{len(paths)}] ERROR: {result.get('message', 'Unknown error')}")
+
+        except Exception as e:
+            error_count += 1
+            error_result = {
+                "status": "error",
+                "message": f"Processing failed: {str(e)}",
+                "file_path": path,
+                "error_type": e.__class__.__name__
+            }
+            results.append(error_result)
+            logger.error(f"💥 [{i+1}/{len(paths)}] EXCEPTION: {path} - {e}")
+
+    # Summary
+    total_files = len(paths)
+    logger.info("=" * 50)
+    logger.info(f"📦 BATCH INGESTION COMPLETED")
+    logger.info(f"   Total files: {total_files}")
+    logger.info(f"   ✅ Successful: {success_count}")
+    logger.info(f"   🚨 Duplicates: {duplicate_count}")
+    logger.info(f"   ❌ Errors: {error_count}")
+    logger.info("=" * 50)
+
+    return {
+        "status": "batch_completed",
+        "summary": {
+            "total_files": total_files,
+            "successful": success_count,
+            "duplicates": duplicate_count,
+            "errors": error_count
+        },
+        "results": results,
+        "force_ingest": force_ingest
+    }

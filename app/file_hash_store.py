@@ -94,6 +94,14 @@ class FileHashStore:
             "file_exists": os.path.exists(self.store_path)
         }
 
+    def clear_all_hashes(self):
+        """Clear all file hashes (DANGER: removes duplicate detection memory)"""
+        hash_count = len(self._hashes)
+        self._hashes = {}
+        self.save()
+        logger.warning(f"🗑️ CLEARED ALL FILE HASHES: {hash_count} hashes removed from {self.store_path}")
+        return hash_count
+
 def import_timestamp():
     """Get current timestamp for import tracking"""
     import datetime
