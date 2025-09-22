@@ -209,27 +209,25 @@ async def simple_chat(body: ChatIn):
         # Use new simple orchestrator
         result = await process_simple_search(body.session_id, body.message)
         
-        # Add total execution time
-        total_time = time.time() - start_time
-        result["total_execution_time_seconds"] = total_time
-        
-        logger.info(f"📤 [simple_chat] Response prepared with {len(result.get('results', []))} results")
-        logger.info(f"⏱️ [simple_chat] Total execution time: {total_time:.2f}s")
+        # Simplify response for clean presentation - remove technical details
+        simple_result = {
+            "response": result.get("response", "Sorry, no results found."),
+            "results": result.get("results", [])
+        }
+
+        logger.info(f"📤 [simple_chat] Simple response prepared with {len(simple_result.get('results', []))} results")
         logger.info("=" * 80)
         logger.info("🎉 SIMPLE CHAT REQUEST COMPLETED SUCCESSFULLY")
         logger.info("=" * 80)
-        
-        return JSONResponse(result)
+
+        return JSONResponse(simple_result)
         
     except Exception as e:
         logger.error(f"💥 [simple_chat] Simple chat request failed: {e}")
         logger.error("=" * 80)
         return JSONResponse({
-            "error": f"Simple chat failed: {e}",
             "response": "Sorry, an error occurred while processing the request.",
-            "results": [],
-            "intent": "error",
-            "total_execution_time_seconds": time.time() - start_time
+            "results": []
         }, status_code=500)
 
 @app.post("/ingest")

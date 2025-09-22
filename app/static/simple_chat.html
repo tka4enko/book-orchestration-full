@@ -100,11 +100,6 @@
             color: #666;
             margin-bottom: 8px;
         }
-        .result-score {
-            font-size: 0.8em;
-            color: #28a745;
-            font-weight: bold;
-        }
         .input-area { 
             padding: 20px; 
             border-top: 1px solid #eee; 
@@ -153,15 +148,6 @@
             color: #800000;
             display: block;
         }
-        .debug-info {
-            margin-top: 10px;
-            padding: 8px;
-            background: #f8f9fa;
-            border-radius: 4px;
-            font-size: 0.8em;
-            color: #666;
-            border-left: 3px solid #28a745;
-        }
         .quick-queries {
             display: flex;
             flex-wrap: wrap;
@@ -202,23 +188,13 @@
                 <label for="sessionId">Session ID:</label>
                 <input type="text" id="sessionId" value="simple_test_001" />
             </div>
-            <div class="approach-comparison">
-                <strong>🆚 Approach comparison:</strong> 
-                This interface uses <strong>/simple_chat</strong> (new approach) instead of <strong>/chat</strong> (old BM25+Vector). 
-                Compare results!
-            </div>
         </div>
 
         <div class="messages" id="messages">
             <div class="message bot">
-                <div class="response">Welcome to BookBot simple search! 🎉
+                <div class="response">Welcome to BookBot! 🎉
 
-New approach:
-• Simple vector search (without BM25)
-• Asynchronous queries to books & content collections
-• Merge duplicates (max 2 chunks per book) 
-• LLM analyzes and filters results
-• Understands complex queries: "detectives but not Agatha Christie"
+Ask me to find books by author, title, genre, or topic. I'll search our library and present the best matches.
 
 Try any query or use the quick buttons below!</div>
                 
@@ -327,52 +303,19 @@ Try any query or use the quick buttons below!</div>
             if (data.results && data.results.length > 0) {
                 html += `<div class="results">`;
                 html += `<h4>📚 Found books (${data.results.length}):</h4>`;
-                
+
                 data.results.forEach((result, index) => {
                     const title = result.title || 'Unknown';
                     const author = result.author || 'Unknown';
-                    const score = result.score ? (result.score * 100).toFixed(1) + '%' : 'N/A';
-                    const collection = result.collection || 'unknown';
-                    const year = result.metadata?.year || '';
-                    
+
                     html += `<div class="result-item">`;
                     html += `<div class="result-title">${index + 1}. "${escapeHtml(title)}" - ${escapeHtml(author)}</div>`;
-                    html += `<div class="result-meta">`;
-                    if (year) html += `Year: ${year} • `;
-                    html += `Collection: ${collection}`;
-                    html += `</div>`;
-                    html += `<div class="result-score">Relevance: ${score}</div>`;
                     html += `</div>`;
                 });
-                
-                html += `</div>`;
-            }
-            
-            // Uncertainty information if any
-            if (data.uncertainty_note) {
-                html += `<div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em;">`;
-                html += `<strong>⚠️ Note:</strong> ${escapeHtml(data.uncertainty_note)}`;
-                html += `</div>`;
-            }
 
-            // Debug information
-            html += `<div class="debug-info">`;
-            html += `<strong>🔍 Analysis:</strong> Intent: ${data.intent || 'N/A'} • `;
-            html += `Found: ${data.search_stats?.total_found || 0} • `;
-            html += `After filter: ${data.search_stats?.after_filter || 0}<br>`;
-            
-            if (data.performance_metrics) {
-                const metrics = data.performance_metrics;
-                html += `<strong>⏱️ Performance:</strong> `;
-                if (metrics.search_time) html += `Search: ${metrics.search_time.toFixed(2)}s • `;
-                if (metrics.filter_time) html += `Filter: ${metrics.filter_time.toFixed(2)}s • `;
-                if (metrics.format_time) html += `Format: ${metrics.format_time.toFixed(2)}s • `;
-                html += `Total: ${(data.total_execution_time_seconds || responseTime/1000).toFixed(2)}s`;
-            } else {
-                html += `<strong>⏱️ Response time:</strong> ${(responseTime/1000).toFixed(2)}s`;
+                html += `</div>`;
             }
             
-            html += `</div>`;
             
             messageDiv.innerHTML = html;
             messages.appendChild(messageDiv);
@@ -386,7 +329,7 @@ Try any query or use the quick buttons below!</div>
             
             if (loading) {
                 status.className = 'status loading';
-                status.textContent = '🔍 Performing simple search... (vector search + LLM filter)';
+                status.textContent = '🔍 Searching for books...';
                 sendBtn.disabled = true;
                 sendBtn.textContent = 'Wait...';
             } else {

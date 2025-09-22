@@ -13,7 +13,7 @@ class SimpleLLMFilter:
     
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="gpt-3.5-turbo",
+            model=OPENAI_MODEL_CHAT,
             temperature=0,  # Deterministic result
             api_key=OPENAI_API_KEY
         )
@@ -161,15 +161,21 @@ OTHER QUERIES:
 - Title: match book title
 - Topic: match "Topics:" section
 
-MATCHING CRITERIA:
+MATCHING CRITERIA - STRICT MODE:
 - ISBN queries: if ISBN found in Content preview → INCLUDE automatically
 - Author queries: check "Author: " section in Content preview
 - Title queries: check book title at start of Content preview
 - Genre queries: check "Genre: " section in Content preview
 - Topic queries: check "Topics: " section in Content preview
-- For multi-criteria: ALL specified elements must match
 
-PRINCIPLE: Balance accuracy with helpfulness. Include books that are reasonably related to the query theme, even if not exact matches. Consider semantic similarity scores and related concepts. Higher similarity scores (>0.3) suggest stronger relevance."""
+CRITICAL RULE FOR MULTI-CRITERIA QUERIES:
+If the query contains MULTIPLE elements, then:
+1. Split the query into separate search terms
+2. Check if EVERY term is found in the book's content
+3. If ANY term is NOT found → IMMEDIATELY EXCLUDE that book
+4. Only include books where ALL terms are present
+
+PRINCIPLE: STRICT MATCHING ONLY. If even one criterion fails, exclude the book entirely. No exceptions."""
 
         # Add user preferences section if available
         if user_preferences:
