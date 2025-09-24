@@ -202,7 +202,7 @@ Generate a friendly clarification question that:
 
 Be conversational and helpful. Suggest concrete options they can choose from."""
 
-        response = llm_generative.invoke([("user", clarification_prompt)])
+        response = await llm_generative.ainvoke([("user", clarification_prompt)])
         return response.content.strip()
 
     except Exception as e:
@@ -248,7 +248,7 @@ RESPONSE GUIDELINES:
 
 Generate a warm, human response that feels like talking to a friend who happens to love books."""
 
-        response = llm_generative.invoke([("user", chat_prompt)])
+        response = await llm_generative.ainvoke([("user", chat_prompt)])
         return response.content.strip()
 
     except Exception as e:
@@ -546,7 +546,7 @@ Apply your natural language understanding to determine intent, giving priority t
 
 Answer only the intent (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
         
-        response = llm_deterministic.invoke([("user", router_prompt)]).content.strip().upper()
+        response = (await llm_deterministic.ainvoke([("user", router_prompt)])).content.strip().upper()
 
         logger.info(f"🧠 [router] LLM response: '{response}'")
 
