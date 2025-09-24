@@ -48,8 +48,9 @@ class ChatAgentState(BaseModel):
     should_search: bool = False
     should_recommend: bool = False
 
-# LLM is used only for recommendations, not for routing
-llm = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0.7, api_key=OPENAI_API_KEY)
+# LLM clients with different temperatures for different tasks
+llm_generative = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0.7, api_key=OPENAI_API_KEY)  # For creative responses
+llm_deterministic = ChatOpenAI(model=OPENAI_MODEL_CHAT, temperature=0.0, api_key=OPENAI_API_KEY)  # For intent classification
 
 async def extract_and_update_preferences(
     state: ChatAgentState,
@@ -201,7 +202,7 @@ Generate a friendly clarification question that:
 
 Be conversational and helpful. Suggest concrete options they can choose from."""
 
-        response = llm.invoke([("user", clarification_prompt)])
+        response = llm_generative.invoke([("user", clarification_prompt)])
         return response.content.strip()
 
     except Exception as e:
@@ -247,7 +248,7 @@ RESPONSE GUIDELINES:
 
 Generate a warm, human response that feels like talking to a friend who happens to love books."""
 
-        response = llm.invoke([("user", chat_prompt)])
+        response = llm_generative.invoke([("user", chat_prompt)])
         return response.content.strip()
 
     except Exception as e:
@@ -545,7 +546,7 @@ Apply your natural language understanding to determine intent, giving priority t
 
 Answer only the intent (SEARCH/ANALYTICS/RECOMMEND/CLARIFY/CHAT):"""
         
-        response = llm.invoke([("user", router_prompt)]).content.strip().upper()
+        response = llm_deterministic.invoke([("user", router_prompt)]).content.strip().upper()
 
         logger.info(f"🧠 [router] LLM response: '{response}'")
 
