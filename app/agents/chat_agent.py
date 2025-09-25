@@ -33,7 +33,7 @@ class ChatAgentState(BaseModel):
     user_preferences: Dict[str, Any] = Field(default_factory=dict)
     current_preferences: Optional[Dict[str, Any]] = None  # Latest extracted preferences for "еще" fallback
     previous_criteria: set = Field(default_factory=set)  # Previous themes/genres for change detection
-    seen_books: set = Field(default_factory=set)  # Books mentioned/recommended in this session
+    seen_books: List[str] = Field(default_factory=list)  # Book IDs mentioned/recommended in this session
 
     # Results (unified for chat and search)
     results: List[Dict[str, Any]] = Field(default_factory=list)
@@ -87,7 +87,7 @@ async def extract_and_update_preferences(
             logger.info(f"📝 [extract_preferences] Criteria changed from {previous_criteria} to {current_criteria}, clearing filters")
             # Clear seen books for new topic
             if hasattr(state, 'seen_books'):
-                state.seen_books = set()
+                state.seen_books = []
 
         # Store current criteria for next comparison
         state.previous_criteria = current_criteria
@@ -365,17 +365,11 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
             chat_history.append({"role": role, "content": msg.content})
 
         # Get books seen in this conversation to exclude from recommendations
-        seen_books = set()
-        if hasattr(state, 'seen_books') and state.seen_books:
-            seen_books = state.seen_books
+        seen_book_ids = set(state.seen_books) if hasattr(state, 'seen_books') and state.seen_books else set()
+        logger.info(f"🔍 [node_recommendations] Current seen_books: {list(seen_book_ids)} (total: {len(seen_book_ids)})")
 
-        # Extract seen book titles from previous results in this session
-        for msg in state.messages:
-            if isinstance(msg, AIMessage) and "**" in msg.content:
-                # Simple extraction of book titles from previous responses
-                import re
-                book_titles = re.findall(r'\*\*(.*?)\*\*', msg.content)
-                seen_books.update(book_titles)
+        # Note: We now track book IDs from structured results, not by parsing Markdown
+        # This eliminates format-dependent tracking and ensures stable deduplication
 
         # Extract user preferences using universal function
         logger.info("🧠 [node_recommendations] Extracting user preferences from chat context...")
@@ -390,7 +384,7 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
             current_message=message_content,
             chat_history=chat_history,
             user_preferences=user_preferences,
-            exclude_books=seen_books
+            exclude_books=seen_book_ids
         )
 
         # Extract response and update state
@@ -399,11 +393,16 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
 
         # Update seen books with new recommendations
         if not hasattr(state, 'seen_books'):
-            state.seen_books = set()
+            state.seen_books = []
 
+        # Track books by ID to ensure stable deduplication
         for rec in recommendations:
-            if rec.get("title"):
-                state.seen_books.add(rec["title"])
+            book_id = rec.get("document_id")
+            if book_id:
+                # Add unique IDs only (list with deduplication)
+                unique_books = set(state.seen_books)
+                unique_books.add(book_id)
+                state.seen_books = list(unique_books)
 
         # Add AI response to messages (standard LangGraph approach)
         state.messages.append(AIMessage(content=reply))

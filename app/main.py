@@ -822,15 +822,34 @@ async def chat_agent_websocket(websocket: WebSocket):
             # Create HumanMessage from user input
             from langchain_core.messages import HumanMessage
 
-            # Use new chat-agent orchestrator with proper LangGraph messages
-            state = ChatAgentState(
-                session_id=session_id,
-                messages=[HumanMessage(content=user_message)],
-                chat_history=chat_history
-            )
             # Use thread_id to preserve state between messages
             config = {"configurable": {"thread_id": session_id}}
-            result = await chat_agent_graph.ainvoke(state, config=config)
+
+            # Get existing state from checkpoint to preserve seen_books and other data
+            try:
+                snapshot = await chat_agent_graph.aget_state(config)
+                if snapshot and snapshot.values:
+                    # Update existing state with new message
+                    current_state = snapshot.values
+                    current_state["messages"] = [HumanMessage(content=user_message)]
+                    current_state["chat_history"] = chat_history
+                else:
+                    # First message - create minimal state
+                    current_state = ChatAgentState(
+                        session_id=session_id,
+                        messages=[HumanMessage(content=user_message)],
+                        chat_history=chat_history
+                    )
+            except Exception as e:
+                logger.warning(f"⚠️ Could not get checkpoint state: {e}")
+                # Fallback to new state
+                current_state = ChatAgentState(
+                    session_id=session_id,
+                    messages=[HumanMessage(content=user_message)],
+                    chat_history=chat_history
+                )
+
+            result = await chat_agent_graph.ainvoke(current_state, config=config)
             
             # Format response
             if hasattr(result, "model_dump"):

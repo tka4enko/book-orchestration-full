@@ -73,7 +73,7 @@ CRITICAL RULES:
 1. Recommend books that match user preferences from the available database
 2. DO NOT invent or hallucinate book titles or authors that are not in the provided list
 3. Prioritize preference matching over quantity
-4. Skip books that appear in the "exclude" list
+4. Skip books whose document_id appears in the "exclude" list
 5. BE HONEST: If no matching books are found, return empty recommendations list
 
 STRICT MATCHING CRITERIA:
@@ -123,6 +123,7 @@ REASONING FOR SPECIFIC PREFERENCES:
 """
 
 
+@traceable(name="process_smart_recommendations")
 async def process_smart_recommendations(
     session_id: str,
     current_message: str,
@@ -244,11 +245,11 @@ async def _get_books_for_recommendations(
         if not all_books:
             return []
 
-        # Filter out excluded books
+        # Filter out excluded books by document ID
         filtered_books = []
         for book in all_books:
-            book_title = book.get("title", "")
-            if book_title not in exclude_books:
+            book_id = book.get("document_id", f"{book.get('title', '')}|{book.get('author', '')}")
+            if book_id not in exclude_books:
                 filtered_books.append(book)
 
         # Limit to reasonable number for LLM processing
@@ -301,6 +302,7 @@ async def _generate_recommendations(
 
             book_info = {
                 "index": i,  # Add index for easier reference
+                "document_id": book.get("document_id", f"{title}|{author}"),  # Include document_id for exclusion
                 "title": title,
                 "author": author,
                 "primary_genre": primary_genre,
@@ -347,8 +349,8 @@ async def _generate_recommendations(
                     logger.info("✅ [recommendations] LLM honestly reported no suitable books available")
                     return recommendations  # Respect LLM's honest decision
                 else:
-                    logger.warning("⚠️ [recommendations] No valid recommendations found, FALLBACK DISABLED FOR TESTING")
-                    return recommendations  # Return empty instead of fallback
+                    logger.warning("⚠️ [recommendations] No valid recommendations found, using fallback")
+                    return _get_fallback_recommendations(books_data, user_preferences)
 
             return recommendations
         except json.JSONDecodeError:
@@ -461,7 +463,8 @@ def _validate_recommendations(
                 "author": original_book.get("author", rec_author),
                 "genre": original_book.get("primary_genre", rec.get("genre", "Unknown")),
                 "reasoning": rec.get("reasoning", "Good match from our collection"),
-                "confidence": rec.get("confidence", 0.8)
+                "confidence": rec.get("confidence", 0.8),
+                "document_id": original_book.get("document_id", f"{rec_title}|{rec_author}")  # Use stable ID
             }
             valid_recommendations.append(validated_rec)
             logger.info(f"✅ [validation] Valid: '{rec_title}' by {rec_author}")
@@ -562,7 +565,8 @@ def _get_fallback_recommendations(
                     "author": book.get("author", "Unknown"),
                     "genre": book.get("primary_genre", "Unknown"),
                     "reasoning": reasoning,
-                    "confidence": min(0.8, 0.5 + score * 0.3)  # Scale confidence based on score
+                    "confidence": min(0.8, 0.5 + score * 0.3),  # Scale confidence based on score
+                    "document_id": book.get("document_id", f"{title}|{book.get('author', 'Unknown')}")  # Stable ID
                 })
 
                 seen_genres.add(genre)
@@ -571,12 +575,15 @@ def _get_fallback_recommendations(
         # If still no recommendations, get any available books
         if not recommendations and books_data:
             for book in books_data[:3]:
+                title = book.get("title", "Unknown")
+                author = book.get("author", "Unknown")
                 recommendations.append({
-                    "title": book.get("title", "Unknown"),
-                    "author": book.get("author", "Unknown"),
+                    "title": title,
+                    "author": author,
                     "genre": book.get("primary_genre", "Unknown"),
                     "reasoning": "Available book from our collection",
-                    "confidence": 0.5
+                    "confidence": 0.5,
+                    "document_id": book.get("document_id", f"{title}|{author}")  # Stable ID for fallback
                 })
 
         logger.info("📚 [fallback] Generated %d fallback recommendations", len(recommendations))
@@ -632,7 +639,6 @@ def _generate_fallback_reasoning(
     """Generate reasoning for fallback recommendation"""
     try:
         genre = book.get("primary_genre", "Unknown")
-        author = book.get("author", "Unknown")
 
         if user_preferences and score > 0.7:
             return f"Good match for your preferences - {genre} genre from our collection"
