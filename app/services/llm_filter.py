@@ -4,7 +4,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from langsmith import traceable
 from langsmith.run_helpers import get_current_run_tree
-from .settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
+from ..infra.settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
 

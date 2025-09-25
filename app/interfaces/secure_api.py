@@ -13,7 +13,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from .security import security_validator, security_logger, get_client_ip
 from .ingest import ingest_one, books_store, content_store
 from .orchestrator import graph, ChatState
-from .agents.chat_orchestrator import graph_with_chat, ChatStateWithChat
+from ..agents.chat_orchestrator import graph_with_chat, ChatStateWithChat
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

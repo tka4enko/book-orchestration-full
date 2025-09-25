@@ -4,11 +4,11 @@ from fastapi import FastAPI, UploadFile, File, Form, Query, WebSocket, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
-from .core.ingestion import ingest_one, ingest_batch, books_store, content_store
-from .agents.search_agent import graph, ChatState
-from .agents.chat_orchestrator import graph_with_chat, ChatStateWithChat
-from .agents.chat_agent import chat_agent_graph, ChatAgentState
-from .services.search_service import process_simple_search
+from ..core.ingestion import ingest_one, ingest_batch, books_store, content_store
+from ..agents.search_agent import graph, ChatState
+from ..agents.chat_orchestrator import graph_with_chat, ChatStateWithChat
+from ..agents.chat_agent import chat_agent_graph, ChatAgentState
+from ..services.search_service import process_simple_search
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Pre-load NLTK data at startup for better performance
 logger.info("🔧 Pre-loading NLTK data...")
 try:
-    from .retrievers import _ensure_nltk
+    from ..services.hybrid_retriever import _ensure_nltk
     _ensure_nltk()
     logger.info("✅ NLTK data loaded successfully")
 except Exception as e:
@@ -25,7 +25,7 @@ except Exception as e:
 # Clear BM25 cache on startup (Railway sleep/restart recovery)
 logger.info("🔧 Clearing BM25 cache for Railway restart recovery...")
 try:
-    from .retrievers import clear_bm25_cache
+    from ..services.hybrid_retriever import clear_bm25_cache
     clear_bm25_cache()
     logger.info("✅ BM25 cache cleared - will rebuild on first search")
 except Exception as e:
@@ -34,7 +34,7 @@ except Exception as e:
 # Clear ChromaDB lock files on startup (SQLite WAL/SHM cleanup)
 logger.info("🔧 Cleaning ChromaDB lock files for startup recovery...")
 import glob
-from .settings import CHROMA_DIR
+from ..infra.settings import CHROMA_DIR
 try:
     lock_patterns = [
         f"{CHROMA_DIR}/*.lock",
@@ -66,7 +66,7 @@ logger.info(f"   LANGSMITH_API_KEY: {'*' * 10}...{os.getenv('LANGSMITH_API_KEY',
 logger.info(f"   LANGSMITH_ENDPOINT: {os.getenv('LANGSMITH_ENDPOINT')}")
 
 # Ensure data directories exist (Railway Volume mount support)
-from .settings import CHROMA_DIR, FILE_HASH_STORE_PATH
+from ..infra.settings import CHROMA_DIR, FILE_HASH_STORE_PATH
 import os
 
 # Create Chroma directory
@@ -82,7 +82,7 @@ if hash_store_dir:
 logger.info(f"📝 File hash store path: {FILE_HASH_STORE_PATH}")
 
 app = FastAPI(title="BookBot Final 4")
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "..", "static")), name="static")
 
 class ChatIn(BaseModel):
     session_id: str
@@ -90,7 +90,7 @@ class ChatIn(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    with open(os.path.join(os.path.dirname(__file__), "static", "index.html"), "r", encoding="utf-8") as f:
+    with open(os.path.join(os.path.dirname(__file__), "..", "..", "static", "index.html"), "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 @app.get("/health")
@@ -99,19 +99,19 @@ def health():
 
 @app.get("/chat_test", response_class=HTMLResponse)
 def chat_test():
-    with open(os.path.join(os.path.dirname(__file__), "static", "chat_test.html"), "r", encoding="utf-8") as f:
+    with open(os.path.join(os.path.dirname(__file__), "..", "..", "static", "chat_test.html"), "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 @app.get("/simple-chat", response_class=HTMLResponse)
 def simple_chat_page():
     """Web interface for testing simple search"""
-    with open(os.path.join(os.path.dirname(__file__), "static", "simple_chat.html"), "r", encoding="utf-8") as f:
+    with open(os.path.join(os.path.dirname(__file__), "..", "..", "static", "simple_chat.html"), "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 @app.get("/chat_agent", response_class=HTMLResponse)
 def chat_agent_page():
     """Web interface for testing chat-agent"""
-    with open(os.path.join(os.path.dirname(__file__), "static", "chat_agent.html"), "r", encoding="utf-8") as f:
+    with open(os.path.join(os.path.dirname(__file__), "..", "..", "static", "chat_agent.html"), "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 @app.post("/chat")
@@ -136,7 +136,7 @@ def chat(body: ChatIn):
         logger.info(f"✅ [main.py] [{request_id}] LangGraph execution completed")
         
         # Finalize debug session here - at the very end of request
-        from .infra.debug import finalize_debug
+        from ..infra.debug import finalize_debug
         try:
             # Handle both dict and object types
             if isinstance(out, dict) and 'results' in out:
@@ -740,7 +740,7 @@ def total_database_reset():
     try:
         # Step 3: Clear file hash store
         logger.warning(f"🗑️ [{reset_id}] Step 3: Clearing file hash store...")
-        from .file_hash_store import get_file_hash_store
+        from ..infra.hash_store import get_file_hash_store
         hash_store = get_file_hash_store()
         hash_count = hash_store.clear_all_hashes()
         results["cleared_hashes"] = hash_count
@@ -754,7 +754,7 @@ def total_database_reset():
     try:
         # Step 4: Clear BM25 cache
         logger.warning(f"🗑️ [{reset_id}] Step 4: Clearing BM25 cache...")
-        from .retrievers import clear_bm25_cache
+        from ..services.hybrid_retriever import clear_bm25_cache
         clear_bm25_cache()
         results["cleared_cache"] = True
         logger.warning(f"🗑️ [{reset_id}] BM25 cache cleared")

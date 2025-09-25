@@ -8,8 +8,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from langsmith import traceable
 from langsmith.run_helpers import get_current_run_tree
-from .settings import OPENAI_API_KEY
-from .simple_retriever import SimpleVectorRetriever
+from ..infra.settings import OPENAI_API_KEY
+from .vector_retriever import SimpleVectorRetriever
 
 logger = logging.getLogger(__name__)
 

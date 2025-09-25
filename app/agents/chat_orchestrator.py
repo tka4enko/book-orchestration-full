@@ -6,9 +6,9 @@ from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from .settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
-from .retrievers import isbn_exact, hybrid_with_rerank
-from .utils_isbn import extract_first_isbn
+from ..infra.settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
+from ..services.hybrid_retriever import isbn_exact, hybrid_with_rerank
+from ..core.isbn_utils import extract_first_isbn
 
 logger = logging.getLogger(__name__)
 

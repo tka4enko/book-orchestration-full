@@ -8,16 +8,16 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
 from langchain.retrievers import EnsembleRetriever
 from langchain_core.retrievers import BaseRetriever
-from .settings import (
+from ..infra.settings import (
     
     CHROMA_DIR, BM25_K, VEC_BOOKS_K, VEC_CONTENT_K, RRF_K, OPENAI_MODEL_EMBED, OPENAI_API_KEY, 
     MIN_SIMILARITY_THRESHOLD, SIMILARITY_THRESHOLDS, BM25_THRESHOLDS, 
     LANGUAGE_THRESHOLD_MODIFIERS, MAX_CHUNKS_PER_BOOK,
     CHUNKS_PER_BOOK_IN_CONTENT, CONTENT_SEARCH_EXPAND_K
 )
-from .utils_isbn import normalize_isbn
-from .metadata import detect_lang
-from .infra.debug import set_debug_search_queries, add_debug_step
+from ..core.isbn_utils import normalize_isbn
+from ..metadata import detect_lang
+from ..infra.debug import set_debug_search_queries, add_debug_step
 
 logger = logging.getLogger(__name__)
 

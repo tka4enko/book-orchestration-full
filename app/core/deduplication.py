@@ -2,9 +2,9 @@ import hashlib
 import logging
 from typing import Dict, List, Optional, Tuple
 from langchain_core.documents import Document
-from .retrievers import books_store, content_store
-from .metadata import canon
-from .utils_isbn import normalize_isbn
+from ..retrievers import books_store, content_store
+from ..metadata import canon
+from .isbn_utils import normalize_isbn
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BookBot Chat Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .chat-container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        .header { 
+            background: #007bff; 
+            color: white; 
+            padding: 20px; 
+            border-radius: 10px 10px 0 0; 
+        }
+        .controls { 
+            padding: 20px; 
+            border-bottom: 1px solid #eee; 
+            background: #f8f9fa; 
+        }
+        .control-group { 
+            margin: 10px 0; 
+        }
+        .control-group label { 
+            display: inline-block; 
+            width: 120px; 
+            font-weight: bold; 
+        }
+        .messages { 
+            height: 400px; 
+            overflow-y: auto; 
+            padding: 20px; 
+        }
+        .message { 
+            margin: 10px 0; 
+            padding: 15px; 
+            border-radius: 10px; 
+            max-width: 80%; 
+        }
+        .user { 
+            background: #e3f2fd; 
+            margin-left: auto; 
+            text-align: right; 
+        }
+        .bot { 
+            background: #f5f5f5; 
+        }
+        .input-area { 
+            padding: 20px; 
+            border-top: 1px solid #eee; 
+            display: flex; 
+            gap: 10px; 
+        }
+        .input-area input { 
+            flex: 1; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        .input-area button { 
+            padding: 10px 20px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+        }
+        .chips { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 5px; 
+            margin: 10px 0; 
+        }
+        .chip { 
+            background: #007bff; 
+            color: white; 
+            padding: 8px 15px; 
+            border-radius: 20px; 
+            cursor: pointer; 
+            font-size: 14px; 
+        }
+        .chip:hover { 
+            background: #0056b3; 
+        }
+        .status { 
+            padding: 10px; 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+            display: none; 
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">
+            <h1>🧪 BookBot Chat Test</h1>
+            <p>Testing new orchestrator with chat</p>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Mode:</label>
+                <select id="modeSelect">
+                    <option value="chat">Chat + Search</option>
+                    <option value="original">Original Search</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Session ID:</label>
+                <input type="text" id="sessionId" value="test-session" style="width: 200px;">
+            </div>
+            <div class="control-group">
+                <label>Test Messages:</label>
+                <button onclick="sendTestMessage('Hello!')">Hello</button>
+                <button onclick="sendTestMessage('Find books on psychology')">Search Books</button>
+                <button onclick="sendTestMessage('Tell me about weather')">About Weather</button>
+            </div>
+        </div>
+        
+        <div id="status" class="status">
+            <span id="statusText">Connecting...</span>
+        </div>
+        
+        <div id="messages" class="messages"></div>
+        
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Write a message..." disabled>
+            <button onclick="sendMessage()" id="sendButton" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const statusDiv = document.getElementById('status');
+        const statusText = document.getElementById('statusText');
+        const modeSelect = document.getElementById('modeSelect');
+        const sessionIdInput = document.getElementById('sessionId');
+
+        let ws = null;
+
+        function connectWebSocket() {
+            const mode = modeSelect.value;
+            const endpoint = mode === 'chat' ? '/ws/chat_test' : '/ws/chat';
+            
+            if (ws) {
+                ws.close();
+            }
+
+            ws = new WebSocket(`ws://localhost:8000${endpoint}`);
+
+            ws.onopen = function() {
+                updateStatus(`✅ Connected to ${endpoint}`);
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+            };
+
+            ws.onclose = function() {
+                updateStatus('❌ Connection lost', true);
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+            };
+
+            ws.onerror = function() {
+                updateStatus('❌ Connection error', true);
+            };
+
+            ws.onmessage = function(event) {
+                const response = JSON.parse(event.data);
+                displayBotMessage(response);
+            };
+        }
+
+        function updateStatus(message, isError = false) {
+            statusDiv.style.display = 'block';
+            statusText.textContent = message;
+            statusDiv.style.background = isError ? '#f8d7da' : '#d4edda';
+            statusDiv.style.borderColor = isError ? '#f5c6cb' : '#c3e6cb';
+        }
+
+        function sendTestMessage(message) {
+            messageInput.value = message;
+            sendMessage();
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && !messageInput.disabled && ws) {
+                displayUserMessage(message);
+                ws.send(JSON.stringify({
+                    session_id: sessionIdInput.value,
+                    message: message
+                }));
+                messageInput.value = '';
+            }
+        }
+
+        function displayUserMessage(message) {
+            const div = document.createElement('div');
+            div.className = 'message user';
+            div.textContent = message;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function displayBotMessage(response) {
+            const div = document.createElement('div');
+            div.className = 'message bot';
+            
+            // Text response
+            const replyDiv = document.createElement('div');
+            replyDiv.textContent = response.reply;
+            div.appendChild(replyDiv);
+            
+            // Chips (quick actions)
+            if (response.chips && response.chips.length > 0) {
+                const chipsDiv = document.createElement('div');
+                chipsDiv.className = 'chips';
+                response.chips.forEach(chip => {
+                    const chipDiv = document.createElement('div');
+                    chipDiv.className = 'chip';
+                    chipDiv.textContent = chip.text;
+                    chipDiv.onclick = () => {
+                        messageInput.value = chip.text;
+                        sendMessage();
+                    };
+                    chipsDiv.appendChild(chipDiv);
+                });
+                div.appendChild(chipsDiv);
+            }
+            
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Send on Enter
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Mode change
+        modeSelect.addEventListener('change', connectWebSocket);
+
+        // Welcome message
+        setTimeout(() => {
+            displayBotMessage({
+                reply: "Hello! I'm BookBot with a new orchestrator. Choose a mode and try different types of messages! 🧪",
+                chips: [
+                    {"text": "Hello!"},
+                    {"text": "Find books on psychology"},
+                    {"text": "Tell me about weather"}
+                ]
+            });
+        }, 1000);
+
+        // Connect on load
+        connectWebSocket();
+    </script>
+</body>
+</html>

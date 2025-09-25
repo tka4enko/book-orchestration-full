@@ -2,13 +2,13 @@ import os, uuid, hashlib, json, logging
 from typing import List, Dict, Tuple
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
-from .infra.settings import CHROMA_DIR, OPENAI_MODEL_EMBED, OPENAI_API_KEY, CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHUNKS, DEBUG_INGEST_STAGES
-from .core.loaders import load_text_from_file
-from .metadata import build_master_meta
-from .metadata_llm import extract_metadata_llm, extract_basic_metadata, enhance_metadata_from_chunks
-from .core.isbn_utils import normalize_isbn
-from .core.deduplication import detect_duplicates, should_skip_ingestion, calculate_file_hash
-from .file_hash_store import get_file_hash_store
+from ..infra.settings import CHROMA_DIR, OPENAI_MODEL_EMBED, OPENAI_API_KEY, CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHUNKS, DEBUG_INGEST_STAGES
+from .loaders import load_text_from_file
+from ..metadata import build_master_meta
+from ..metadata_llm import extract_metadata_llm, extract_basic_metadata, enhance_metadata_from_chunks
+from .isbn_utils import normalize_isbn
+from .deduplication import detect_duplicates, should_skip_ingestion, calculate_file_hash
+from ..infra.hash_store import get_file_hash_store
 
 logger = logging.getLogger(__name__)
 

@@ -6,9 +6,9 @@ from langgraph.graph import StateGraph, END, add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from .settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
-from .simple_orchestrator import process_simple_search
-from .smart_analytics_orchestrator import process_smart_analytics
+from ..infra.settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY
+from ..services.search_service import process_simple_search
+from ..services.analytics_service import process_smart_analytics
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ async def extract_and_update_preferences(
 ) -> Dict[str, Any]:
     """Universal preference extraction and state update function for both search and recommendations."""
     try:
-        from .smart_recommendation_orchestrator import _extract_user_preferences
+        from ..services.recommendation_service import _extract_user_preferences
 
         # Extract preferences using the same LLM and prompt as recommendations
         extracted_preferences = await _extract_user_preferences(message_content, chat_history)
@@ -158,8 +158,9 @@ async def _generate_smart_clarification(message_content: str, state: ChatAgentSt
     """Generate intelligent clarification questions based on available metadata"""
     try:
         # Get available metadata for context-aware clarification
-        from .simple_retriever import simple_retriever
-        available_books = await simple_retriever._get_all_books_metadata()
+        from ..services.vector_retriever import SimpleVectorRetriever
+        retriever = SimpleVectorRetriever()
+        available_books = await retriever.get_all_books_metadata()
 
         # Extract unique metadata values for intelligent suggestions
         authors = set()
@@ -382,7 +383,7 @@ async def node_recommendations(state: ChatAgentState) -> ChatAgentState:
         user_preferences = pref_result["user_preferences"]
 
         # Use smart recommendation orchestrator
-        from .smart_recommendation_orchestrator import process_smart_recommendations
+        from ..services.recommendation_service import process_smart_recommendations
 
         recommendation_result = await process_smart_recommendations(
             session_id=state.session_id,

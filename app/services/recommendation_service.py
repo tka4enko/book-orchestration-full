@@ -11,8 +11,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langsmith import traceable
 
-from .settings import OPENAI_API_KEY, OPENAI_MODEL_CHAT
-from .simple_retriever import SimpleVectorRetriever
+from ..infra.settings import OPENAI_API_KEY, OPENAI_MODEL_CHAT
+from .vector_retriever import SimpleVectorRetriever
 
 logger = logging.getLogger(__name__)
 

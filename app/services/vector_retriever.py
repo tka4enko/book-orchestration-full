@@ -5,7 +5,7 @@ import time
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
-from .settings import CHROMA_DIR, OPENAI_MODEL_EMBED, OPENAI_API_KEY, CHUNKS_PER_BOOK_IN_CONTENT
+from ..infra.settings import CHROMA_DIR, OPENAI_MODEL_EMBED, OPENAI_API_KEY, CHUNKS_PER_BOOK_IN_CONTENT
 
 logger = logging.getLogger(__name__)
 

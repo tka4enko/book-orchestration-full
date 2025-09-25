@@ -12,9 +12,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
-from app import orchestrator_chat_agent as chat_module  # noqa: E402
+from app.agents import chat_agent as chat_module  # noqa: E402
 from app import smart_intent_system  # noqa: E402
-from app.orchestrator_chat_agent import ChatAgentState, chat_agent_graph, ensure_pydantic_state  # noqa: E402
+from app.agents.chat_agent import ChatAgentState, chat_agent_graph, ensure_pydantic_state  # noqa: E402
 
 
 def _extract_last_text(messages):
@@ -56,9 +56,9 @@ class DummyClarifyLLM:
 
 @pytest.fixture(autouse=True)
 def stub_chat_dependencies(monkeypatch):
-    from app import smart_analytics_orchestrator as analytics_module
-    from app import smart_recommendation_orchestrator as recommendation_module
-    from app import smart_simple_orchestrator as simple_module
+    from app.services import analytics_service as analytics_module
+    from app.services import recommendation_service as recommendation_module
+    from app.services import search_service as simple_module
     from app import smart_transition_system
 
     monkeypatch.setattr(chat_module, "ChatOpenAI", DummyChatLLM)

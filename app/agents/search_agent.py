@@ -6,12 +6,12 @@ from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 from fuzzywuzzy import fuzz
-from .settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY, MIN_SIMILARITY_THRESHOLD
-from .retrievers import isbn_exact, hybrid_with_rerank
-from .utils_isbn import extract_first_isbn
-from .mixed_filters_parser import MixedFiltersParser
-from .infra.debug import (start_debug, set_debug_intent, add_debug_step, add_debug_issue, finalize_debug,
-                           set_debug_query_processing, set_debug_search_queries, add_debug_filtered_result,
+from ..infra.settings import OPENAI_MODEL_CHAT, OPENAI_API_KEY, MIN_SIMILARITY_THRESHOLD
+from ..services.hybrid_retriever import isbn_exact, hybrid_with_rerank
+from ..core.isbn_utils import extract_first_isbn
+from ..core.query_parser import MixedFiltersParser
+from ..infra.debug import (start_debug, set_debug_intent, add_debug_step, add_debug_issue, finalize_debug,
+                           set_debug_query_processing, set_debug_search_queries, add_debug_filtered_result, 
                            set_debug_final_response, set_debug_final_books, set_performance_metrics, set_search_metrics)
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def _filter_results_by_relevance(query: str, docs: List, threshold: float = MIN_
     
     try:
         from langchain_openai import OpenAIEmbeddings
-        from .settings import OPENAI_MODEL_EMBED
+        from ..infra.settings import OPENAI_MODEL_EMBED
         import math
         
         embeddings_func = OpenAIEmbeddings(model=OPENAI_MODEL_EMBED, api_key=OPENAI_API_KEY)
@@ -120,7 +120,7 @@ def _is_simple_query(query: str) -> bool:
 def _get_pattern_analysis_details(query: str) -> Dict[str, Any]:
     """Detailed pattern analysis for debug purposes"""
     import re
-    from .utils_isbn import extract_first_isbn
+    from ..core.isbn_utils import extract_first_isbn
     
     details = {
         "patterns_found": [],
